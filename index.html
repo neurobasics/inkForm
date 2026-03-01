@@ -1,258 +1,1513 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Rorschach Compositor</title>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INKFORM — Rorschach Compositor</title>
 <style>
-html,body{
-  margin:0;
-  background:#000;
-  color:#ccc;
-  font-family:Helvetica,Arial,sans-serif;
-  overflow:hidden;
-}
-
-/* LEFT PANEL */
-#ui{
-  position:fixed;
-  left:0;
-  top:0;
-  bottom:0;
-  width:300px;
-  overflow-y:auto;
-  background:#0b0b0b;
-  padding:14px;
-  box-sizing:border-box;
-  font-size:.65rem;
-  letter-spacing:.04em;
-}
-
-h2{
-  font-size:.65rem;
-  font-weight:600;
-  margin:18px 0 8px;
-  text-transform:uppercase;
-  color:#666;
-}
-
-label{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:6px;
-  color:#888;
-}
-
-input[type=range]{
-  -webkit-appearance:none;
-  width:120px;
-  height:2px;
-  background:#333;
-  outline:none;
-}
-
-input[type=range]::-webkit-slider-thumb{
-  -webkit-appearance:none;
-  width:10px;
-  height:10px;
-  background:#888;
-  border-radius:50%;
-  cursor:pointer;
-}
-
-button, select{
-  background:#111;
-  border:1px solid #222;
-  color:#aaa;
-  padding:4px 6px;
-  font-size:.6rem;
-  cursor:pointer;
-}
-
-button.on{
-  background:#222;
-  border-color:#444;
-  color:#fff;
-}
-
-.section{
-  margin-bottom:16px;
-}
-
-/* PREVIEW */
-#previewWrap{
-  position:absolute;
-  left:300px;
-  top:0;
-  right:0;
-  bottom:0;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  background:#000;
-}
-
-canvas{
-  max-width:100%;
-  max-height:100%;
-}
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400&display=swap');
+  :root{--ink:#0a0a0f;--paper:#f5f2ed;--accent:#7c5cbf;--gray:#777;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--ink);color:var(--paper);font-family:'IBM Plex Mono',monospace;min-height:100vh;overflow-x:hidden;}
+  header{display:flex;align-items:baseline;gap:16px;padding:20px 36px 16px;border-bottom:1px solid #222;}
+  header h1{font-family:'Bebas Neue',sans-serif;font-size:2.4rem;letter-spacing:.12em;color:var(--paper);}
+  header span{font-size:.62rem;color:var(--gray);letter-spacing:.2em;text-transform:uppercase;}
+  .layout{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - 65px);}
+  .sidebar{border-right:1px solid #222;padding:18px;overflow-y:auto;display:flex;flex-direction:column;gap:20px;}
+  .slabel{font-size:.55rem;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;}
+  .upload-zone{border:1px dashed #333;border-radius:3px;padding:14px;text-align:center;cursor:pointer;transition:all .2s;position:relative;background:#0d0d14;}
+  .upload-zone:hover,.upload-zone.drag-over{border-color:var(--accent);background:#131320;}
+  .upload-zone.has-file{border-color:#3a3a5c;border-style:solid;}
+  .upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+  .upload-icon{font-size:1.3rem;margin-bottom:5px;opacity:.4;}
+  .upload-zone p{font-size:.6rem;color:var(--gray);line-height:1.5;}
+  .upload-zone .fname{color:var(--paper);font-size:.62rem;margin-top:3px;word-break:break-all;}
+  .cg{display:flex;flex-direction:column;gap:12px;}
+  .cr{display:flex;flex-direction:column;gap:4px;}
+  .cr label{display:flex;justify-content:space-between;font-size:.6rem;color:var(--gray);}
+  .cr label span{color:var(--paper);}
+  input[type=range]{-webkit-appearance:none;width:100%;height:2px;background:#333;outline:none;border-radius:1px;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:var(--accent);cursor:pointer;}
+  .tr{display:flex;justify-content:space-between;align-items:center;font-size:.6rem;color:var(--gray);}
+  .tog{width:32px;height:16px;background:#333;border-radius:8px;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0;}
+  .tog.on{background:var(--accent);}
+  .tog::after{content:'';position:absolute;width:10px;height:10px;border-radius:50%;background:white;top:3px;left:3px;transition:left .2s;}
+  .tog.on::after{left:19px;}
+  .mode-pills{display:flex;gap:1px;background:#1a1a26;border-radius:3px;overflow:hidden;}
+  .mpill{flex:1;padding:6px 3px;background:transparent;border:none;color:var(--gray);font-family:'IBM Plex Mono',monospace;font-size:.5rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all .2s;text-align:center;}
+  .mpill.active{background:#2a2a40;color:var(--paper);}
+  .mpill:hover:not(.active){color:var(--paper);}
+  /* color wheel */
+  .wheel-wrap{display:flex;align-items:center;gap:12px;}
+  .wheel-rel{position:relative;width:68px;height:68px;flex-shrink:0;cursor:crosshair;}
+  #colorWheel{border-radius:50%;display:block;width:68px;height:68px;}
+  .wcursor{position:absolute;width:8px;height:8px;border-radius:50%;border:2px solid white;pointer-events:none;transform:translate(-50%,-50%);box-shadow:0 0 4px rgba(0,0,0,.9);top:50%;left:50%;}
+  .wheel-sliders{flex:1;display:flex;flex-direction:column;gap:8px;}
+  .cprev{width:100%;height:12px;border-radius:2px;border:1px solid #333;margin-top:2px;}
+  /* export */
+  .etabs{display:flex;gap:1px;background:#1a1a26;border-radius:3px;overflow:hidden;}
+  .etab{flex:1;padding:7px 3px;background:transparent;border:none;color:var(--gray);font-family:'IBM Plex Mono',monospace;font-size:.5rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all .2s;text-align:center;}
+  .etab.active{background:var(--accent);color:white;}
+  .etab:hover:not(.active){color:var(--paper);}
+  .enote{font-size:.55rem;color:var(--gray);line-height:1.5;padding:6px 8px;background:#0d0d14;border-radius:2px;border-left:2px solid #2a2a40;}
+  .seq-progress{width:100%;height:3px;background:#222;border-radius:2px;overflow:hidden;display:none;}
+  .seq-fill{height:100%;background:var(--accent);width:0%;}
+  .seq-info{font-size:.55rem;color:var(--gray);display:none;}
+  .btn-process{width:100%;padding:12px;background:var(--accent);color:white;border:none;font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:.2em;cursor:pointer;border-radius:2px;transition:background .2s,transform .1s;margin-top:4px;}
+  .btn-process:hover{background:#9070d8;}
+  .btn-process:active{transform:scale(.98);}
+  .btn-process:disabled{background:#333;color:#555;cursor:not-allowed;}
+  .btn-exp{width:100%;padding:9px;background:transparent;color:var(--accent);border:1px solid var(--accent);font-family:'IBM Plex Mono',monospace;font-size:.58rem;letter-spacing:.12em;cursor:pointer;border-radius:2px;transition:all .2s;text-transform:uppercase;display:none;}
+  .btn-exp:hover{background:var(--accent);color:white;}
+  /* preview */
+  .preview-area{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;gap:14px;background:#050508;position:relative;}
+  .canvas-wrap{position:relative;display:flex;align-items:center;justify-content:center;width:100%;max-width:680px;}
+  canvas{max-width:100%;border:1px solid #1a1a2e;display:block;border-radius:2px;}
+  .checker{background-image:linear-gradient(45deg,#1e1e1e 25%,transparent 25%),linear-gradient(-45deg,#1e1e1e 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#1e1e1e 75%),linear-gradient(-45deg,transparent 75%,#1e1e1e 75%);background-size:14px 14px;background-position:0 0,0 7px,7px -7px,-7px 0px;border-radius:2px;padding:1px;}
+  #placeholder{width:640px;height:360px;border:1px dashed #222;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border-radius:2px;max-width:100%;}
+  #placeholder .big{font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:.2em;color:#2a2a3a;}
+  #placeholder p{font-size:.56rem;letter-spacing:.15em;text-transform:uppercase;color:#333;}
+  .playback{display:flex;gap:10px;align-items:center;}
+  .btn-play{background:none;border:1px solid #333;color:var(--paper);font-family:'IBM Plex Mono',monospace;font-size:.6rem;padding:7px 16px;cursor:pointer;letter-spacing:.12em;text-transform:uppercase;border-radius:2px;transition:all .2s;display:none;}
+  .btn-play:hover{border-color:var(--accent);color:var(--accent);}
+  .progbar{width:180px;height:2px;background:#222;border-radius:1px;overflow:hidden;display:none;}
+  .progfill{height:100%;background:var(--accent);width:0%;}
+  .timedis{font-size:.58rem;color:var(--gray);display:none;}
+  .statusbar{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);font-size:.56rem;letter-spacing:.2em;text-transform:uppercase;color:var(--gray);white-space:nowrap;}
+  .desc{font-size:.58rem;color:var(--gray);line-height:1.6;padding:6px 8px;background:#0a0a14;border-radius:2px;border-left:2px solid #2a2a40;}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
-
 <body>
+<header>
+  <h1>INKFORM</h1>
+  <span>Rorschach Compositor v2</span>
+</header>
+<div class="layout">
+<div class="sidebar">
 
-<div id="ui">
-
-  <h2>Media</h2>
-  <div class="section">
-    <label>Ink Video <input type="file" id="inkUpload" accept="video/*"></label>
-    <label>Plate Video <input type="file" id="plateUpload" accept="video/*"></label>
+  <div>
+    <div class="slabel">01 — Person Plate</div>
+    <div class="upload-zone" id="plateZone">
+      <input type="file" id="plateInput" accept="video/*">
+      <div class="upload-icon">◈</div><p>Drop subject video</p>
+      <div class="fname" id="plateName"></div>
+    </div>
   </div>
 
-  <h2>Composite Mode</h2>
-  <div class="section">
-    <button id="modeInkMasks" class="on">Ink Masks Person</button>
-    <button id="modePersonCuts">Person Cuts Ink</button>
-    <button id="modeSplit">Split</button>
+  <div>
+    <div class="slabel">02 — Ink Blot Footage</div>
+    <div class="upload-zone" id="inkZone">
+      <input type="file" id="inkInput" accept="video/*">
+      <div class="upload-icon">◉</div><p>Drop ink blot video</p>
+      <div class="fname" id="inkName"></div>
+    </div>
   </div>
 
-  <h2>Mirror</h2>
-  <div class="section">
-    <button id="mirrorH">Horizontal</button>
-    <button id="mirrorV">Vertical</button>
+  <div>
+    <div class="slabel">03 — Mirror</div>
+    <div class="cg">
+      <div class="tr"><span>Horizontal (Rorschach)</span><div class="tog on" id="mirrorH" onclick="this.classList.toggle('on');updatePreview()"></div></div>
+      <div class="tr"><span>Vertical</span><div class="tog" id="mirrorV" onclick="this.classList.toggle('on');updatePreview()"></div></div>
+      <div class="cr">
+        <label>Mirror amount <span id="spreadVal">1.00</span></label>
+        <input type="range" id="mirrorSpread" min="1" max="100" value="100" oninput="updateVal('spreadVal',(this.value/100).toFixed(2));updatePreview()">
+      </div>
+    </div>
   </div>
 
-  <h2>Threshold</h2>
-  <div class="section">
-    <label>Ink Threshold <input type="range" id="inkThresh" min="0" max="255" value="120"></label>
-    <label>Edge Feather <input type="range" id="edgeFeather" min="0" max="20" value="4"></label>
+  <div>
+    <div class="slabel">03b — Center Ink Overlay</div>
+    <div class="cg">
+      <div class="tr"><span>Enable</span><div class="tog" id="centerInkToggle" onclick="this.classList.toggle('on');updatePreview()"></div></div>
+      <div class="cr">
+        <label>Overlay mirror amount <span id="centerSpreadVal">0.30</span></label>
+        <input type="range" id="centerInkSpread" min="1" max="100" value="30" oninput="updateVal('centerSpreadVal',(this.value/100).toFixed(2));updatePreview()">
+      </div>
+      <div class="cr">
+        <label>Overlay opacity <span id="centerOpVal">80%</span></label>
+        <input type="range" id="centerInkOpacity" min="0" max="100" value="80" oninput="updateVal('centerOpVal',this.value+'%');updatePreview()">
+      </div>
+    </div>
   </div>
 
-  <h2>Color</h2>
-  <div class="section">
-    <button id="bwToggle">Black & White</button>
-    <label>Saturation <input type="range" id="saturation" min="0" max="200" value="100"></label>
-    <label>Contrast <input type="range" id="contrast" min="0" max="200" value="100"></label>
-    <label>Brightness <input type="range" id="brightness" min="0" max="200" value="100"></label>
+  <div>
+    <div class="slabel">04 — Composite Mode</div>
+    <div class="cg">
+      <div class="mode-pills">
+        <button class="mpill active" id="modeA" onclick="setMode('inkMasksPerson')">Ink → Person</button>
+        <button class="mpill" id="modeB" onclick="setMode('personCutsInk')">Person → Ink</button>
+      </div>
+      <div class="desc" id="modeDesc">Ink shape reveals person. Outside ink = background (transparent on export).</div>
+      <div class="cr">
+        <label>Ink threshold <span id="threshVal">110</span></label>
+        <input type="range" id="inkThresh" min="0" max="255" value="110" oninput="updateVal('threshVal',this.value);updatePreview()">
+      </div>
+      <div class="cr">
+        <label>Edge falloff <span id="featherVal">3</span></label>
+        <input type="range" id="edgeFeather" min="1" max="30" value="3" oninput="updateVal('featherVal',this.value);updatePreview()">
+      </div>
+      <div class="cr">
+        <label>Edge smooth <span id="smoothVal">0</span></label>
+        <input type="range" id="edgeSmooth" min="0" max="12" value="0" oninput="updateVal('smoothVal',this.value);updatePreview()">
+      </div>
+      <div class="cr">
+        <label>Person shape <span id="shapeVal">0%</span></label>
+        <input type="range" id="personShape" min="0" max="100" value="0" oninput="updateVal('shapeVal',this.value+'%');updatePreview()">
+      </div>
+      <div class="tr" style="margin-top:6px;"><span>Invert (ink on white)</span><div class="tog" id="invertToggle" onclick="this.classList.toggle('on');updatePreview()"></div></div>
+      <div class="desc" id="invertDesc" style="font-size:.5rem;color:var(--gray);line-height:1.3;">White background, dark ink forms. Person appears as detail within dark ink shapes — like the Gnarls Barkley "Crazy" video look.</div>
+    </div>
   </div>
 
-  <h2>Background</h2>
-  <div class="section">
-    <button id="bgToggle" class="on">White Background</button>
+  <div>
+    <div class="slabel">05 — Color</div>
+    <div class="cg">
+      <div class="tr">
+        <span>Black &amp; White</span>
+        <div class="tog" id="bwToggle" onclick="this.classList.toggle('on');toggleBW();updatePreview()"></div>
+      </div>
+      <div id="colorControls">
+        <div class="mode-pills" style="margin-bottom:8px;">
+          <button class="mpill active" id="tintSolid" onclick="setTintMode('solid')">Solid</button>
+          <button class="mpill" id="tintRamp" onclick="setTintMode('ramp')">Ramp</button>
+        </div>
+
+        <!-- SOLID TINT -->
+        <div id="solidControls">
+          <div class="wheel-wrap">
+            <div class="wheel-rel" id="wheelWrap">
+              <canvas id="colorWheel" width="68" height="68"></canvas>
+              <div class="wcursor" id="wheelCursor"></div>
+            </div>
+            <div class="wheel-sliders">
+              <div class="cr">
+                <label>Hex <span id="hexVal">#7C5CBF</span></label>
+                <div style="display:flex;gap:6px;align-items:center;margin-top:2px;">
+                  <input type="color" id="solidColorPicker" value="#7C5CBF" style="width:28px;height:22px;padding:0;border:1px solid #333;background:none;cursor:pointer;border-radius:2px;" oninput="applyHexInput(this.value)">
+                  <input type="text" id="hexInput" value="#7C5CBF" maxlength="7" spellcheck="false" style="flex:1;background:#0d0d14;border:1px solid #333;color:var(--paper);font-family:'IBM Plex Mono',monospace;font-size:.6rem;padding:3px 6px;border-radius:2px;" onchange="applyHexInput(this.value)">
+                </div>
+              </div>
+              <div class="cprev" id="colorPreview"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RAMP TINT -->
+        <div id="rampControls" style="display:none;">
+          <div class="mode-pills" style="margin-bottom:6px;">
+            <button class="mpill active" id="rampH" onclick="setRampType('horizontal')">H</button>
+            <button class="mpill" id="rampV" onclick="setRampType('vertical')">V</button>
+            <button class="mpill" id="rampR" onclick="setRampType('radial')">Radial</button>
+            <button class="mpill" id="rampL" onclick="setRampType('luminance')">Luma</button>
+          </div>
+          <div style="position:relative;margin-bottom:4px;">
+            <canvas id="rampBar" width="264" height="22" style="width:100%;height:22px;border-radius:2px;cursor:crosshair;display:block;border:1px solid #333;"></canvas>
+            <canvas id="rampStops" width="264" height="14" style="width:100%;height:14px;cursor:pointer;display:block;"></canvas>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+            <label style="font-size:.55rem;color:var(--gray);white-space:nowrap;">Selected</label>
+            <input type="color" id="rampColorPicker" value="#000000" style="width:28px;height:22px;padding:0;border:1px solid #333;background:none;cursor:pointer;border-radius:2px;" oninput="applyRampHex(this.value)">
+            <input type="text" id="rampHexInput" value="#000000" maxlength="7" spellcheck="false" style="width:70px;background:#0d0d14;border:1px solid #333;color:var(--paper);font-family:'IBM Plex Mono',monospace;font-size:.6rem;padding:3px 6px;border-radius:2px;" onchange="applyRampHex(this.value)">
+            <button onclick="deleteRampStop()" style="background:none;border:1px solid #333;color:var(--gray);font-size:.55rem;padding:2px 6px;cursor:pointer;border-radius:2px;font-family:'IBM Plex Mono',monospace;">✕</button>
+          </div>
+          <div class="desc" style="font-size:.5rem;line-height:1.4;margin-bottom:4px;">Click bar to add stop. Drag to move. Min 2 stops.</div>
+        </div>
+
+        <div class="cr">
+          <label>Tint strength <span id="tintVal">15%</span></label>
+          <input type="range" id="tintStrength" min="0" max="100" value="15" oninput="updateVal('tintVal',this.value+'%');updatePreview()">
+        </div>
+        <div class="cr">
+          <label>Desaturate <span id="satVal">65%</span></label>
+          <input type="range" id="saturation" min="0" max="100" value="65" oninput="updateVal('satVal',this.value+'%');updatePreview()">
+        </div>
+      </div>
+      <div class="cr">
+        <label>Contrast <span id="contrastVal">1.3</span></label>
+        <input type="range" id="contrast" min="50" max="250" value="130" oninput="updateVal('contrastVal',(this.value/100).toFixed(1));updatePreview()">
+      </div>
+      <div class="cr">
+        <label>Brightness <span id="brightnessVal">1.0</span></label>
+        <input type="range" id="brightness" min="40" max="160" value="100" oninput="updateVal('brightnessVal',(this.value/100).toFixed(1));updatePreview()">
+      </div>
+      <div class="cr">
+        <label>Gamma <span id="gammaVal">1.0</span></label>
+        <input type="range" id="gamma" min="30" max="300" value="100" oninput="updateVal('gammaVal',(this.value/100).toFixed(1));updatePreview()">
+      </div>
+      <div style="margin-top:6px;">
+        <button class="btn-exp" style="font-size:.5rem;padding:4px 8px;" onclick="loadCrazyPreset()">Load "Crazy" Video Preset</button>
+      </div>
+    </div>
   </div>
+
+  <div>
+    <div class="slabel">06 — Background</div>
+    <div class="cg">
+      <div class="tr"><span>White paper</span><div class="tog on" id="bgToggle" onclick="this.classList.toggle('on');updatePreview()"></div></div>
+      <div class="tr"><span>Tint ink areas</span><div class="tog" id="inkTintToggle" onclick="this.classList.toggle('on');updatePreview()"></div></div>
+      <div class="desc" style="font-size:.5rem;">Applies current tint color to ink shapes. The Crazy video ink is purple-gray, not pure black.</div>
+      <div class="cr">
+        <label>Paper grain <span id="grainVal">0%</span></label>
+        <input type="range" id="paperGrain" min="0" max="50" value="0" oninput="updateVal('grainVal',this.value+'%');updatePreview()">
+      </div>
+      <div class="tr"><span>Preview alpha (checkerboard)</span><div class="tog" id="alphaToggle" onclick="this.classList.toggle('on');toggleAlphaBg();updatePreview()"></div></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="slabel">07 — Scan Lines</div>
+    <div class="cg">
+      <div class="tr"><span>Enable</span><div class="tog" id="scanToggle" onclick="this.classList.toggle('on');updatePreview()"></div></div>
+      <div class="cr">
+        <label>Line spacing <span id="scanSpaceVal">2</span>px</label>
+        <input type="range" id="scanSpacing" min="2" max="8" value="2" oninput="updateVal('scanSpaceVal',this.value);updatePreview()">
+      </div>
+      <div class="cr">
+        <label>Line opacity <span id="scanOpVal">12%</span></label>
+        <input type="range" id="scanOpacity" min="1" max="40" value="12" oninput="updateVal('scanOpVal',this.value+'%');updatePreview()">
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="slabel">08 — Export</div>
+    <div class="cg">
+      <div class="etabs">
+        <button class="etab active" id="tab0" onclick="setExportMode(0)">Composite</button>
+        <button class="etab" id="tab1" onclick="setExportMode(1)">Ink Only</button>
+        <button class="etab" id="tab2" onclick="setExportMode(2)">Person Only</button>
+      </div>
+      <div class="enote" id="exportNote">Full composite · transparent background · alpha PNG</div>
+      <div class="cr">
+        <label>Sequence FPS <span id="fpsVal">24</span></label>
+        <input type="range" id="exportFps" min="12" max="30" value="24" step="1" oninput="updateVal('fpsVal',this.value)">
+      </div>
+      <div class="seq-progress" id="seqProgress"><div class="seq-fill" id="seqFill"></div></div>
+      <div class="seq-info" id="seqInfo"></div>
+      <button class="btn-exp" id="exportFrameBtn" onclick="exportCurrentFrame()">↓ Export Frame (PNG + α)</button>
+      <button class="btn-exp" id="exportSeqBtn" onclick="exportSequence()">↓ Export PNG Sequence → Choose Folder</button>
+      <button class="btn-exp" id="exportSettingsBtn" onclick="exportSettings()">↓ Export Settings (TXT)</button>
+    </div>
+  </div>
+
+  <button class="btn-process" id="processBtn" onclick="processVideo()" disabled>PROCESS COMPOSITE</button>
 
 </div>
 
-<div id="previewWrap">
-  <canvas id="preview"></canvas>
+<!-- PREVIEW -->
+<div class="preview-area" id="previewArea">
+  <div class="canvas-wrap" id="canvasWrap">
+    <div id="placeholder">
+      <div class="big">LOAD FOOTAGE</div>
+      <p>Upload both videos to begin</p>
+    </div>
+    <canvas id="outputCanvas" style="display:none"></canvas>
+  </div>
+  <div class="playback">
+    <button class="btn-play" id="playBtn" onclick="togglePlay()">▶ Play</button>
+    <div class="progbar" id="progBar"><div class="progfill" id="progFill"></div></div>
+    <div class="timedis" id="timeDis">0:00 / 0:00</div>
+  </div>
+  <div class="statusbar" id="statusBar">AWAITING INPUT</div>
 </div>
+</div>
+
+<video id="plateVideo" style="display:none" crossorigin="anonymous" loop playsinline></video>
+<video id="inkVideo"   style="display:none" crossorigin="anonymous" loop playsinline></video>
+<canvas id="wkPlate" style="display:none"></canvas>
+<canvas id="wkInk"   style="display:none"></canvas>
 
 <script>
-const preview=document.getElementById('preview');
-const ctx=preview.getContext('2d');
+// ── STATE ──────────────────────────────────────────────────────
+let plateReady=false, inkReady=false, isPlaying=false, processed=false, isExporting=false;
+let animFrame=null, compositeMode='inkMasksPerson', exportModeNum=0;
+let tintH=270, tintS=0.6;
+let plateBaseName='person', inkBaseName='ink';
+function stripExt(n){return n.replace(/\.[^/.]+$/,'').replace(/[^a-zA-Z0-9_\-]/g,'_').slice(0,40);}
 
-let inkVideo=document.createElement('video');
-let plateVideo=document.createElement('video');
-inkVideo.muted=true;
-plateVideo.muted=true;
+const plateVideo = document.getElementById('plateVideo');
+const inkVideo   = document.getElementById('inkVideo');
+const outCanvas  = document.getElementById('outputCanvas');
+const wkPlate    = document.getElementById('wkPlate');
+const wkInk      = document.getElementById('wkInk');
+const outCtx = outCanvas.getContext('2d',{willReadFrequently:true});
+const pCtx   = wkPlate.getContext('2d',  {willReadFrequently:true});
+const iCtx   = wkInk.getContext('2d',    {willReadFrequently:true});
 
-let compositeMode='inkMasksPerson';
-
-document.getElementById('modeInkMasks').onclick=()=>{
-  compositeMode='inkMasksPerson';
-  setModeButtons(0);
+// ── UPLOADS ────────────────────────────────────────────────────
+function setupUpload(inputId,zoneId,nameId,videoEl,flag){
+  const input=document.getElementById(inputId);
+  const zone=document.getElementById(zoneId);
+  const nameEl=document.getElementById(nameId);
+  input.addEventListener('change',e=>{
+    const file=e.target.files[0]; if(!file)return;
+    videoEl.src=URL.createObjectURL(file); videoEl.load();
+    nameEl.textContent=file.name; zone.classList.add('has-file');
+    if(flag==='plate') plateBaseName=stripExt(file.name);
+    if(flag==='ink')   inkBaseName=stripExt(file.name);
+    videoEl.addEventListener('loadeddata',()=>{
+      if(flag==='plate')plateReady=true; if(flag==='ink')inkReady=true; checkReady();
+    },{once:true});
+  });
+  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag-over');});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('drag-over'));
+  zone.addEventListener('drop',e=>{
+    e.preventDefault(); zone.classList.remove('drag-over');
+    const file=e.dataTransfer.files[0];
+    if(file&&file.type.startsWith('video/')){input.files=e.dataTransfer.files;input.dispatchEvent(new Event('change'));}
+  });
 }
-document.getElementById('modePersonCuts').onclick=()=>{
-  compositeMode='personCutsInk';
-  setModeButtons(1);
-}
-document.getElementById('modeSplit').onclick=()=>{
-  compositeMode='split';
-  setModeButtons(2);
-}
+setupUpload('plateInput','plateZone','plateName',plateVideo,'plate');
+setupUpload('inkInput','inkZone','inkName',inkVideo,'ink');
 
-function setModeButtons(i){
-  document.querySelectorAll('#ui button').forEach(b=>b.classList.remove('on'));
-  document.querySelectorAll('#ui button')[i+2].classList.add('on');
+function checkReady(){
+  if(plateReady&&inkReady){
+    document.getElementById('processBtn').disabled=false;
+    document.getElementById('statusBar').textContent='READY — CLICK PROCESS';
+  }
 }
 
-document.getElementById('inkUpload').onchange=e=>{
-  inkVideo.src=URL.createObjectURL(e.target.files[0]);
-  inkVideo.play();
+// ── PROCESS ────────────────────────────────────────────────────
+function processVideo(){
+  if(!plateReady||!inkReady)return;
+  const W=plateVideo.videoWidth||640, H=plateVideo.videoHeight||360;
+  [outCanvas,wkPlate,wkInk].forEach(c=>{c.width=W;c.height=H;});
+  document.getElementById('placeholder').style.display='none';
+  outCanvas.style.display='block';
+  plateVideo.currentTime=0; inkVideo.currentTime=0;
+  processed=true;
+  if(animFrame)cancelAnimationFrame(animFrame);
+  animFrame=requestAnimationFrame(renderLoop);
+  document.getElementById('playBtn').style.display='inline-block';
+  document.getElementById('progBar').style.display='block';
+  document.getElementById('timeDis').style.display='block';
+  document.getElementById('exportFrameBtn').style.display='block';
+  document.getElementById('exportSeqBtn').style.display='block';
+  document.getElementById('exportSettingsBtn').style.display='block';
+  document.getElementById('statusBar').textContent='PRESS PLAY TO ANIMATE';
 }
-document.getElementById('plateUpload').onchange=e=>{
-  plateVideo.src=URL.createObjectURL(e.target.files[0]);
-  plateVideo.play();
+
+// ── RENDER LOOP ────────────────────────────────────────────────
+function renderLoop(){
+  if(!processed)return;
+  draw(outCtx, outCanvas.width, outCanvas.height, false);
+  if(isPlaying){
+    const dur=plateVideo.duration||1, t=plateVideo.currentTime;
+    document.getElementById('progFill').style.width=(t/dur*100)+'%';
+    const fmt=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+    document.getElementById('timeDis').textContent=`${fmt(t)} / ${fmt(dur)}`;
+  }
+  animFrame=requestAnimationFrame(renderLoop);
 }
 
-function resize(){
-  preview.width=window.innerWidth-300;
-  preview.height=window.innerHeight;
-}
-window.onresize=resize;
-resize();
+// ── CORE DRAW ──────────────────────────────────────────────────
+// alphaOnly=true → output has transparent bg regardless of bgToggle
+function draw(ctx, W, H, alphaOnly){
+  const mirH   = document.getElementById('mirrorH').classList.contains('on');
+  const mirV   = document.getElementById('mirrorV').classList.contains('on');
+  const bw     = document.getElementById('bwToggle').classList.contains('on');
+  const whiteBg= !alphaOnly && document.getElementById('bgToggle').classList.contains('on');
+  const thresh = parseInt(document.getElementById('inkThresh').value);
+  const feather= parseInt(document.getElementById('edgeFeather').value);
+  const spread = parseInt(document.getElementById('mirrorSpread').value) / 100;
+  const personShapeAmt = parseInt(document.getElementById('personShape').value) / 100;
+  const centerInkOn = document.getElementById('centerInkToggle').classList.contains('on');
+  const centerSpread = parseInt(document.getElementById('centerInkSpread').value) / 100;
+  const centerOpacity = parseInt(document.getElementById('centerInkOpacity').value) / 100;
+  const invertMode = document.getElementById('invertToggle').classList.contains('on');
+  const tintStr= document.getElementById('tintStrength').value/100;
+  const sat    = document.getElementById('saturation').value/100;
+  const contr  = document.getElementById('contrast').value/100;
+  const bright = document.getElementById('brightness').value/100;
+  const gamma  = parseInt(document.getElementById('gamma').value) / 100;
+  const inkTintOn = document.getElementById('inkTintToggle').classList.contains('on');
+  const grain  = parseInt(document.getElementById('paperGrain').value) / 100;
+  const rampLUT = tintMode==='ramp' ? buildRampLUT() : null;
 
-function render(){
-  requestAnimationFrame(render);
-  if(!inkVideo.videoWidth||!plateVideo.videoWidth)return;
+  // Draw raw frames — shared spread for person + ink
+  drawMirrored(pCtx,plateVideo,W,H,mirH,mirV,spread);
+  drawMirrored(iCtx,inkVideo,  W,H,mirH,mirV,spread);
 
-  ctx.clearRect(0,0,preview.width,preview.height);
+  // Get pixel data
+  const plateData = pCtx.getImageData(0,0,W,H);
+  const inkData   = iCtx.getImageData(0,0,W,H);
+  const pd=plateData.data, id=inkData.data;
 
-  const W=preview.width;
-  const H=preview.height;
+  // Compute person silhouette from RAW plate (before grading) — bright = person on black bg
+  let personMask=null;
+  if(personShapeAmt>0){
+    personMask=new Float32Array(W*H);
+    for(let p=0;p<W*H;p++){
+      const i=p*4;
+      const lum=0.299*pd[i]+0.587*pd[i+1]+0.114*pd[i+2];
+      const x=(lum-20)/10;
+      personMask[p]=1.0/(1.0+Math.exp(-x));
+    }
+  }
 
-  ctx.drawImage(inkVideo,0,0,W,H);
-  const inkData=ctx.getImageData(0,0,W,H);
-  const id=inkData.data;
+  // Grade plate (contrast, brightness, saturation, gamma — NO tint here, tint is post-composite)
+  for(let i=0;i<pd.length;i+=4){
+    let r=pd[i],g=pd[i+1],b=pd[i+2];
+    const origLum=0.299*r+0.587*g+0.114*b;
+    const gray=origLum;
+    r=r+(gray-r)*sat; g=g+(gray-g)*sat; b=b+(gray-b)*sat;
+    r=((r/255-.5)*contr+.5)*255*bright;
+    g=((g/255-.5)*contr+.5)*255*bright;
+    b=((b/255-.5)*contr+.5)*255*bright;
+    if(gamma!==1){
+      r=255*Math.pow(Math.max(0,r/255),gamma);
+      g=255*Math.pow(Math.max(0,g/255),gamma);
+      b=255*Math.pow(Math.max(0,b/255),gamma);
+    }
+    if(bw){const bwv=0.299*r+0.587*g+0.114*b;r=g=b=bwv;}
+    pd[i]=clamp(r);pd[i+1]=clamp(g);pd[i+2]=clamp(b);
+  }
 
-  ctx.drawImage(plateVideo,0,0,W,H);
-  const plateData=ctx.getImageData(0,0,W,H);
-  const pd=plateData.data;
+  // Build ink mask — sigmoid curve
+  const maskAlpha=new Float32Array(W*H);
+  for(let p=0;p<W*H;p++){
+    const i=p*4;
+    const lum=0.299*id[i]+0.587*id[i+1]+0.114*id[i+2];
+    const x=(thresh-lum)/feather;
+    let m=1.0/(1.0+Math.exp(-x));
+    // Blend with person silhouette: multiply ink mask by person shape
+    if(personMask){
+      const pm=personMask[p];
+      // lerp between pure ink mask and ink*person
+      m=m*(1-personShapeAmt + personShapeAmt*pm);
+    }
+    maskAlpha[p]=m;
+  }
 
-  const thresh=parseInt(document.getElementById('inkThresh').value);
-  const feather=parseInt(document.getElementById('edgeFeather').value);
+  // Smooth mask — rounds out fine detail into flowing curves
+  const smooth=parseInt(document.getElementById('edgeSmooth').value);
+  const finalMask=smooth>0 ? blurMaskFloat(maskAlpha,W,H,smooth) : maskAlpha;
 
+  // Build output pixels
   const out=ctx.createImageData(W,H);
   const od=out.data;
 
-  for(let i=0;i<id.length;i+=4){
-    const lum=0.299*id[i]+0.587*id[i+1]+0.114*id[i+2];
-    const mask=lum<thresh?1:0;
+  const bgR=whiteBg?255:0, bgG=whiteBg?255:0, bgB=whiteBg?255:0;
+  const bgA=alphaOnly?0:(whiteBg?255:0);
 
-    if(compositeMode==='inkMasksPerson'){
-      od[i]=pd[i];
-      od[i+1]=pd[i+1];
-      od[i+2]=pd[i+2];
-      od[i+3]=mask*255;
-    }
-    else if(compositeMode==='personCutsInk'){
-      od[i]=id[i];
-      od[i+1]=id[i+1];
-      od[i+2]=id[i+2];
-      od[i+3]=255-mask*255;
-    }
-    else{
-      if(i/4%W<W/2){
-        od[i]=pd[i];
+  for(let p=0;p<W*H;p++){
+    const i=p*4;
+    const m=finalMask[p]; // 0..1
+    const invM=1-m;
+
+    if(invertMode){
+      // INVERT: ink on white — person appears as detail within dark ink forms
+      if(compositeMode==='inkMasksPerson'){
+        // Get ink color — tinted or pure dark
+        let inkR,inkG,inkB;
+        if(inkTintOn){
+          const px=p%W, py=Math.floor(p/W);
+          const[itr,itg,itb]=getTintForPixel(px,py,W,H,0,rampLUT);
+          inkR=itr*0.3; inkG=itg*0.3; inkB=itb*0.3;
+        } else {
+          inkR=0; inkG=0; inkB=0;
+        }
+        // Person brightness creates subtle relief within the dark ink
+        const darkR=pd[i]*0.35+inkR*0.65;
+        const darkG=pd[i+1]*0.35+inkG*0.65;
+        const darkB=pd[i+2]*0.35+inkB*0.65;
+        if(alphaOnly){
+          od[i]=clamp(darkR); od[i+1]=clamp(darkG); od[i+2]=clamp(darkB);
+          od[i+3]=Math.round(m*255);
+        } else {
+          od[i]  =clamp(invM*255 + m*darkR);
+          od[i+1]=clamp(invM*255 + m*darkG);
+          od[i+2]=clamp(invM*255 + m*darkB);
+          od[i+3]=255;
+        }
+      } else if(compositeMode==='personCutsInk'){
+        const inkLum=clamp(0.299*id[i]+0.587*id[i+1]+0.114*id[i+2]);
+        let inkR,inkG,inkB;
+        if(inkTintOn){
+          const px=p%W, py=Math.floor(p/W);
+          const[itr,itg,itb]=getTintForPixel(px,py,W,H,0,rampLUT);
+          inkR=itr*0.3; inkG=itg*0.3; inkB=itb*0.3;
+        } else { inkR=0;inkG=0;inkB=0; }
+        const darkR=pd[i]*0.35+inkR*0.65;
+        const darkG=pd[i+1]*0.35+inkG*0.65;
+        const darkB=pd[i+2]*0.35+inkB*0.65;
+        od[i]  =clamp(m*darkR + invM*(255-inkLum*0.5));
+        od[i+1]=clamp(m*darkG + invM*(255-inkLum*0.5));
+        od[i+2]=clamp(m*darkB + invM*(255-inkLum*0.5));
+        od[i+3]=255;
+      }
+    } else {
+      // NORMAL MODE (existing logic)
+      if(compositeMode==='inkMasksPerson'){
+        const a=Math.round(m*255);
+        od[i]  =pd[i];
         od[i+1]=pd[i+1];
         od[i+2]=pd[i+2];
-        od[i+3]=255;
-      }else{
-        od[i]=id[i];
-        od[i+1]=id[i+1];
-        od[i+2]=id[i+2];
+        od[i+3]=alphaOnly?a:Math.round(m*255+(1-m)*(bgA));
+        if(!alphaOnly){
+          od[i]  =Math.round(m*pd[i]  +invM*bgR);
+          od[i+1]=Math.round(m*pd[i+1]+invM*bgG);
+          od[i+2]=Math.round(m*pd[i+2]+invM*bgB);
+          od[i+3]=255;
+        }
+      } else if(compositeMode==='personCutsInk'){
+        const inkLum=clamp(0.299*id[i]+0.587*id[i+1]+0.114*id[i+2]);
+        let iR=inkLum,iG=inkLum,iB=inkLum;
+        if(inkTintOn){
+          const px=p%W, py=Math.floor(p/W);
+          const[itr,itg,itb]=getTintForPixel(px,py,W,H,inkLum,rampLUT);
+          iR=inkLum*0.5+itr*0.5; iG=inkLum*0.5+itg*0.5; iB=inkLum*0.5+itb*0.5;
+        }
+        od[i]  =clamp(m*pd[i]  +invM*iR);
+        od[i+1]=clamp(m*pd[i+1]+invM*iG);
+        od[i+2]=clamp(m*pd[i+2]+invM*iB);
         od[i+3]=255;
       }
     }
   }
 
+  // POST-COMPOSITE TINT — colors the entire composite (ink + person + everything)
+  // Weighted by darkness: white paper stays white, dark ink forms get colored
+  // This matches the real Crazy video where the ink itself has a purple/gray gradient
+  if(!bw && tintStr>0){
+    for(let p=0;p<W*H;p++){
+      const i=p*4;
+      if(od[i+3]===0) continue; // skip transparent
+      const lum=0.299*od[i]+0.587*od[i+1]+0.114*od[i+2];
+      const darkness=1-(lum/255); // 1=black, 0=white
+      if(darkness<0.02) continue; // skip pure white
+      const px=p%W, py=Math.floor(p/W);
+      const[tr,tg,tb]=getTintForPixel(px,py,W,H,lum,rampLUT);
+      const strength=tintStr*darkness; // tint fades on lighter areas
+      od[i]  =clamp(od[i]  +(tr-128)*strength*2);
+      od[i+1]=clamp(od[i+1]+(tg-128)*strength*2);
+      od[i+2]=clamp(od[i+2]+(tb-128)*strength*2);
+    }
+  }
+
+  // SCAN LINES — subtle horizontal lines for analog retro feel
+  const scanOn=document.getElementById('scanToggle').classList.contains('on');
+  if(scanOn){
+    const spacing=parseInt(document.getElementById('scanSpacing').value);
+    const scanAlpha=parseInt(document.getElementById('scanOpacity').value)/100;
+    for(let y=0;y<H;y++){
+      if(y%spacing===0){
+        for(let x=0;x<W;x++){
+          const i=(y*W+x)*4;
+          od[i]  =Math.round(od[i]  *(1-scanAlpha));
+          od[i+1]=Math.round(od[i+1]*(1-scanAlpha));
+          od[i+2]=Math.round(od[i+2]*(1-scanAlpha));
+        }
+      }
+    }
+  }
+
   ctx.putImageData(out,0,0);
+
+  // Center ink overlay — rendered on top
+  if(centerInkOn){
+    drawMirrored(iCtx,inkVideo,W,H,mirH,mirV,centerSpread);
+    const cid=iCtx.getImageData(0,0,W,H).data;
+    const overlay=ctx.createImageData(W,H);
+    const ov=overlay.data;
+    for(let p=0;p<W*H;p++){
+      const i=p*4;
+      const lum=0.299*cid[i]+0.587*cid[i+1]+0.114*cid[i+2];
+      const x=(thresh-lum)/feather;
+      const m=1.0/(1.0+Math.exp(-x));
+      // Use tint color for ink if enabled, else pure black
+      if(inkTintOn){
+        const px=p%W, py=Math.floor(p/W);
+        const[itr,itg,itb]=getTintForPixel(px,py,W,H,0,rampLUT);
+        // Darken tint to ~30% brightness for ink color
+        ov[i]=Math.round(itr*0.3); ov[i+1]=Math.round(itg*0.3); ov[i+2]=Math.round(itb*0.3);
+      } else {
+        ov[i]=0; ov[i+1]=0; ov[i+2]=0;
+      }
+      ov[i+3]=Math.round(m*centerOpacity*255);
+    }
+    const tmpC=document.createElement('canvas');
+    tmpC.width=W; tmpC.height=H;
+    tmpC.getContext('2d').putImageData(overlay,0,0);
+    ctx.drawImage(tmpC,0,0);
+    drawMirrored(iCtx,inkVideo,W,H,mirH,mirV,spread);
+  }
+
+  // Paper grain — adds subtle analog texture
+  if(grain>0){
+    const grainData=ctx.getImageData(0,0,W,H);
+    const gd=grainData.data;
+    const grainAmt=grain*60; // max ~30 levels of noise
+    for(let i=0;i<gd.length;i+=4){
+      if(gd[i+3]<10) continue; // skip transparent pixels
+      const n=(Math.random()-0.5)*grainAmt;
+      gd[i]=clamp(gd[i]+n);
+      gd[i+1]=clamp(gd[i+1]+n);
+      gd[i+2]=clamp(gd[i+2]+n);
+    }
+    ctx.putImageData(grainData,0,0);
+  }
 }
 
-render();
-</script>
+// ── MASK BLUR — smooths fine detail into flowing curves ───────
+// Separable box blur: fast O(W*H*2) regardless of radius
+function blurMaskFloat(mask, W, H, radius){
+  if(radius<1) return mask;
+  const r=Math.round(radius);
+  const size=2*r+1;
+  const tmp=new Float32Array(W*H);
+  const out=new Float32Array(W*H);
+  // Horizontal pass
+  for(let y=0;y<H;y++){
+    let sum=0;
+    // Seed with left edge
+    for(let x=-r;x<=r;x++) sum+=mask[y*W+Math.max(0,Math.min(W-1,x))];
+    for(let x=0;x<W;x++){
+      tmp[y*W+x]=sum/size;
+      const addX=Math.min(W-1,x+r+1);
+      const remX=Math.max(0,x-r);
+      sum+=mask[y*W+addX]-mask[y*W+remX];
+    }
+  }
+  // Vertical pass
+  for(let x=0;x<W;x++){
+    let sum=0;
+    for(let y=-r;y<=r;y++) sum+=tmp[Math.max(0,Math.min(H-1,y))*W+x];
+    for(let y=0;y<H;y++){
+      out[y*W+x]=sum/size;
+      const addY=Math.min(H-1,y+r+1);
+      const remY=Math.max(0,y-r);
+      sum+=tmp[addY*W+x]-tmp[remY*W+x];
+    }
+  }
+  return out;
+}
 
+// ── MIRRORING ──────────────────────────────────────────────────
+// Snapshot src to a temp canvas ONCE, then mirror from that — guarantees both halves are identical frame
+const _snapCanvas = document.createElement('canvas');
+const _snapCtx    = _snapCanvas.getContext('2d');
+
+function drawMirrored(ctx, src, W, H, mH, mV, spread) {
+  spread = (spread === undefined) ? 1 : spread;
+  if (_snapCanvas.width !== W || _snapCanvas.height !== H) {
+    _snapCanvas.width = W; _snapCanvas.height = H;
+  }
+  _snapCtx.drawImage(src, 0, 0, W, H);
+
+  ctx.clearRect(0, 0, W, H);
+
+  if (mH) {
+    const hw = W / 2;
+    // Source slides to the LEFT by offset pixels (like moving Position X in AE)
+    // spread=1 → offset=0 → normal Rorschach (left half of source visible)
+    // spread=0 → offset=hw → source shifted fully, right half of source now in left mask
+    const offset = Math.round((1 - spread) * hw);
+
+    // LEFT HALF: draw full source shifted left, clipped to [0..hw]
+    // This means screen shows source columns [offset .. offset+hw]
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, hw, H);
+    ctx.clip();
+    ctx.drawImage(_snapCanvas, 0, 0, W, H, -offset, 0, W, H);
+    ctx.restore();
+
+    // RIGHT HALF: mirror of left half
+    ctx.save();
+    ctx.translate(W, 0);
+    ctx.scale(-1, 1);
+    ctx.beginPath();
+    ctx.rect(0, 0, hw, H);
+    ctx.clip();
+    ctx.drawImage(_snapCanvas, 0, 0, W, H, -offset, 0, W, H);
+    ctx.restore();
+  } else {
+    ctx.drawImage(_snapCanvas, 0, 0, W, H);
+  }
+
+  if (mV) {
+    const hh = H / 2;
+    const offset = Math.round((1 - spread) * hh);
+    const cur = document.createElement('canvas'); cur.width = W; cur.height = H;
+    cur.getContext('2d').drawImage(ctx.canvas, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    // TOP: clip to top half, draw shifted up
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, W, hh);
+    ctx.clip();
+    ctx.drawImage(cur, 0, -offset);
+    ctx.restore();
+
+    // BOTTOM: mirror of top
+    ctx.save();
+    ctx.translate(0, H);
+    ctx.scale(1, -1);
+    ctx.beginPath();
+    ctx.rect(0, 0, W, hh);
+    ctx.clip();
+    ctx.drawImage(cur, 0, -offset);
+    ctx.restore();
+  }
+}
+
+// ── PLAYBACK ───────────────────────────────────────────────────
+function togglePlay(){
+  const btn=document.getElementById('playBtn');
+  if(!isPlaying){
+    plateVideo.play();inkVideo.play();isPlaying=true;
+    btn.textContent='⏸ Pause';
+    document.getElementById('statusBar').textContent='PLAYING';
+  } else {
+    plateVideo.pause();inkVideo.pause();isPlaying=false;
+    btn.textContent='▶ Play';
+    document.getElementById('statusBar').textContent='PAUSED';
+  }
+}
+
+// ── UI ─────────────────────────────────────────────────────────
+function updateVal(id,val){document.getElementById(id).textContent=val;}
+function updatePreview(){if(processed){if(animFrame)cancelAnimationFrame(animFrame);animFrame=requestAnimationFrame(renderLoop);}}
+
+const modeDescs={
+  inkMasksPerson:'Ink shape reveals person inside. Outside the ink shape = transparent on export.',
+  personCutsInk: 'Full ink layer everywhere. Person\'s silhouette cuts through and shows through.'
+};
+function setMode(m){
+  compositeMode=m;
+  ['modeA','modeB'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  const map={inkMasksPerson:'modeA',personCutsInk:'modeB'};
+  document.getElementById(map[m]).classList.add('active');
+  document.getElementById('modeDesc').textContent=modeDescs[m];
+  updatePreview();
+}
+
+function toggleBW(){
+  const bw=document.getElementById('bwToggle').classList.contains('on');
+  document.getElementById('colorControls').style.opacity=bw?.3:1;
+  document.getElementById('colorControls').style.pointerEvents=bw?'none':'auto';
+}
+
+function toggleAlphaBg(){
+  const on=document.getElementById('alphaToggle').classList.contains('on');
+  document.getElementById('canvasWrap').classList.toggle('checker',on);
+}
+
+const exportNotes=[
+  'Full composite · transparent background · alpha PNG',
+  'Ink layer only · ink shape opaque · rest transparent · alpha PNG',
+  'Person layer only · clipped to ink mask · alpha PNG'
+];
+function setExportMode(n){
+  exportModeNum=n;
+  ['tab0','tab1','tab2'].forEach((id,i)=>document.getElementById(id).classList.toggle('active',i===n));
+  document.getElementById('exportNote').textContent=exportNotes[n];
+}
+
+// ── EXPORT: SINGLE FRAME ───────────────────────────────────────
+function exportCurrentFrame(){
+  if(!processed)return;
+  const W=outCanvas.width,H=outCanvas.height;
+  const ec=document.createElement('canvas');ec.width=W;ec.height=H;
+  const ex=ec.getContext('2d');
+  buildExportFrame(ex,W,H);
+  ec.toBlob(blob=>{
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`inkform_${plateBaseName}_${['composite','ink_only','person_only'][exportModeNum]}_frame.png`;
+    a.click();
+  },'image/png');
+}
+
+function exportSettings(){
+  if(!processed)return;
+  const layerLabel=['composite','ink_only','person_only'][exportModeNum];
+  const baseName=`inkform_${plateBaseName}_${layerLabel}`;
+  const fps=parseInt(document.getElementById('exportFps').value);
+  const dur=plateVideo.duration||0;
+  const total=Math.floor(dur*fps);
+  const txt=buildSettingsTxt(baseName, total, fps);
+  const blob=new Blob([txt],{type:'text/plain'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`${baseName}_settings.txt`;
+  a.click();
+}
+
+// ── SETTINGS TXT ───────────────────────────────────────────────
+function buildSettingsTxt(zipName, totalFrames, fps){
+  const bw      = document.getElementById('bwToggle').classList.contains('on');
+  const whiteBg = document.getElementById('bgToggle').classList.contains('on');
+  const mirH    = document.getElementById('mirrorH').classList.contains('on');
+  const mirV    = document.getElementById('mirrorV').classList.contains('on');
+  const thresh  = document.getElementById('inkThresh').value;
+  const feather = document.getElementById('edgeFeather').value;
+  const tintStr = document.getElementById('tintStrength').value;
+  const sat     = document.getElementById('saturation').value;
+  const contr   = document.getElementById('contrast').value;
+  const bright  = document.getElementById('brightness').value;
+  const now = new Date().toISOString().replace('T',' ').slice(0,19);
+  const colorInfo = getRampExportString();
+
+  return [
+    `INKFORM — Export Settings`,
+    `Generated: ${now}`,
+    ``,
+    `── SOURCE ─────────────────────────`,
+    `Person plate   : ${plateBaseName}`,
+    `Ink footage    : ${inkBaseName}`,
+    ``,
+    `── OUTPUT ─────────────────────────`,
+    `Export name    : ${zipName}`,
+    `Layer mode     : ${['Composite','Ink Only','Person Only'][exportModeNum]}`,
+    `Composite mode : ${compositeMode}`,
+    `Total frames   : ${totalFrames}`,
+    `Frame rate     : ${fps} fps`,
+    `Alpha channel  : yes (PNG)`,
+    ``,
+    `── MIRROR ─────────────────────────`,
+    `Horizontal     : ${mirH?'on':'off'}`,
+    `Vertical       : ${mirV?'on':'off'}`,
+    `Mirror amount  : ${(parseInt(document.getElementById('mirrorSpread').value)/100).toFixed(2)}`,
+    ``,
+    `── CENTER INK OVERLAY ─────────────`,
+    `Enabled        : ${document.getElementById('centerInkToggle').classList.contains('on')?'on':'off'}`,
+    `Overlay mirror : ${(parseInt(document.getElementById('centerInkSpread').value)/100).toFixed(2)}`,
+    `Overlay opacity: ${document.getElementById('centerInkOpacity').value}%`,
+    ``,
+    `── MASKING ────────────────────────`,
+    `Ink threshold  : ${thresh}  (0=all mask / 255=no mask)`,
+    `Edge falloff   : ${feather}`,
+    `Edge smooth    : ${document.getElementById('edgeSmooth').value}`,
+    `Person shape   : ${document.getElementById('personShape').value}%`,
+    `Invert (white) : ${document.getElementById('invertToggle').classList.contains('on')?'on':'off'}`,
+    ``,
+    `── COLOR ──────────────────────────`,
+    `Black & White  : ${bw?'on':'off'}`,
+    `Tint           : ${colorInfo}`,
+    `Tint strength  : ${tintStr}%`,
+    `Desaturate     : ${sat}%`,
+    `Contrast       : ${(contr/100).toFixed(2)}`,
+    `Brightness     : ${(bright/100).toFixed(2)}`,
+    `Gamma          : ${(parseInt(document.getElementById('gamma').value)/100).toFixed(2)}`,
+    ``,
+    `── BACKGROUND ─────────────────────`,
+    `White paper    : ${whiteBg?'on':'off'}`,
+    ``,
+    `── SCAN LINES ─────────────────────`,
+    `Enabled        : ${document.getElementById('scanToggle').classList.contains('on')?'on':'off'}`,
+    `Spacing        : ${document.getElementById('scanSpacing').value}px`,
+    `Opacity        : ${document.getElementById('scanOpacity').value}%`,
+  ].join('\n');
+}
+
+// ── EXPORT: PNG SEQUENCE → ZIP ─────────────────────────────────
+async function exportSequence(){
+  if(!processed||isExporting)return;
+  isExporting=true;
+  const fps=parseInt(document.getElementById('exportFps').value);
+  const dur=plateVideo.duration;
+  const total=Math.floor(dur*fps);
+  const W=outCanvas.width,H=outCanvas.height;
+  const sp=document.getElementById('seqProgress');
+  const sf=document.getElementById('seqFill');
+  const si=document.getElementById('seqInfo');
+  sp.style.display='block'; si.style.display='block';
+
+  const layerLabel=['composite','ink_only','person_only'][exportModeNum];
+  const seqName=`inkform_${plateBaseName}_${layerLabel}`;
+
+  // Check File System Access API support
+  if(!window.showDirectoryPicker){
+    si.textContent='Browser does not support folder picker — try Chrome or Edge.';
+    isExporting=false; return;
+  }
+
+  // Show folder picker
+  let dirHandle;
+  try {
+    dirHandle = await window.showDirectoryPicker({
+      id: 'inkform-export',
+      mode: 'readwrite',
+      startIn: 'downloads',
+      suggestedName: seqName
+    });
+  } catch(e) {
+    si.textContent='Folder selection cancelled.';
+    isExporting=false; return;
+  }
+
+  // Create subfolder named after the sequence
+  let subDir;
+  try {
+    subDir = await dirHandle.getDirectoryHandle(seqName, {create:true});
+  } catch(e) {
+    si.textContent='Could not create subfolder — try selecting a different location.';
+    isExporting=false; return;
+  }
+
+  const wasPlaying=isPlaying;
+  if(isPlaying)togglePlay();
+  if(animFrame){cancelAnimationFrame(animFrame);animFrame=null;}
+
+  const ec=document.createElement('canvas'); ec.width=W; ec.height=H;
+  const ex=ec.getContext('2d');
+
+  for(let f=0;f<total;f++){
+    const t=f/fps;
+    plateVideo.currentTime=t;
+    inkVideo.currentTime=t%(inkVideo.duration||dur);
+    await waitSeeked();
+
+    const expSpread=parseInt(document.getElementById('mirrorSpread').value)/100;
+    drawMirrored(pCtx,plateVideo,W,H,
+      document.getElementById('mirrorH').classList.contains('on'),
+      document.getElementById('mirrorV').classList.contains('on'),expSpread);
+    drawMirrored(iCtx,inkVideo,W,H,
+      document.getElementById('mirrorH').classList.contains('on'),
+      document.getElementById('mirrorV').classList.contains('on'),expSpread);
+    buildExportFrame(ex,W,H);
+
+    const fname=`${seqName}_${String(f).padStart(5,'0')}.png`;
+    const blob=await canvasToBlob(ec);
+    const arrayBuf=await blob.arrayBuffer();
+
+    const fileHandle=await subDir.getFileHandle(fname,{create:true});
+    const writable=await fileHandle.createWritable();
+    await writable.write(arrayBuf);
+    await writable.close();
+
+    sf.style.width=((f+1)/total*100)+'%';
+    si.textContent=`Writing frame ${f+1} / ${total} → ${fname}`;
+    await new Promise(r=>setTimeout(r,4));
+  }
+
+  isExporting=false;
+  si.textContent=`✓ Done — ${total} frames written to /${seqName}/`;
+  document.getElementById('statusBar').textContent='EXPORT COMPLETE';
+  if(wasPlaying)togglePlay(); else {animFrame=requestAnimationFrame(renderLoop);}
+}
+
+function canvasToBlob(canvas){
+  return new Promise(res=>canvas.toBlob(res,'image/png'));
+}
+
+function waitSeeked(){
+  return new Promise(res=>{
+    let d1=false,d2=false;
+    const check=()=>{if(d1&&d2)res();};
+    setTimeout(res,500);
+    plateVideo.addEventListener('seeked',()=>{d1=true;check();},{once:true});
+    inkVideo.addEventListener('seeked',()=>{d2=true;check();},{once:true});
+  });
+}
+
+// Build export frame into given ctx (always alpha, no bg fill)
+function buildExportFrame(ctx,W,H){
+  const mirH=document.getElementById('mirrorH').classList.contains('on');
+  const mirV=document.getElementById('mirrorV').classList.contains('on');
+  const bw=document.getElementById('bwToggle').classList.contains('on');
+  const thresh=parseInt(document.getElementById('inkThresh').value);
+  const feather=parseInt(document.getElementById('edgeFeather').value);
+  const personShapeAmt=parseInt(document.getElementById('personShape').value)/100;
+  const centerInkOn=document.getElementById('centerInkToggle').classList.contains('on');
+  const centerSpread=parseInt(document.getElementById('centerInkSpread').value)/100;
+  const centerOpacity=parseInt(document.getElementById('centerInkOpacity').value)/100;
+  const invertMode=document.getElementById('invertToggle').classList.contains('on');
+  const expSpread=parseInt(document.getElementById('mirrorSpread').value)/100;
+  const tintStr=document.getElementById('tintStrength').value/100;
+  const sat=document.getElementById('saturation').value/100;
+  const contr=document.getElementById('contrast').value/100;
+  const bright=document.getElementById('brightness').value/100;
+  const gamma=parseInt(document.getElementById('gamma').value)/100;
+  const inkTintOn=document.getElementById('inkTintToggle').classList.contains('on');
+  const grain=parseInt(document.getElementById('paperGrain').value)/100;
+  const rampLUT = tintMode==='ramp' ? buildRampLUT() : null;
+
+  const pd=pCtx.getImageData(0,0,W,H).data;
+  const id=iCtx.getImageData(0,0,W,H).data;
+
+  // Person silhouette from raw plate
+  let personMask=null;
+  if(personShapeAmt>0){
+    personMask=new Float32Array(W*H);
+    for(let p=0;p<W*H;p++){
+      const i=p*4;
+      const lum=0.299*pd[i]+0.587*pd[i+1]+0.114*pd[i+2];
+      const x=(lum-20)/10;
+      personMask[p]=1.0/(1.0+Math.exp(-x));
+    }
+  }
+
+  // Grade plate pixels
+  const gradedP=new Uint8ClampedArray(pd.length);
+  for(let i=0;i<pd.length;i+=4){
+    let r=pd[i],g=pd[i+1],b=pd[i+2];
+    const origLum=0.299*r+0.587*g+0.114*b;
+    const gray=origLum;
+    r=r+(gray-r)*sat;g=g+(gray-g)*sat;b=b+(gray-b)*sat;
+    r=((r/255-.5)*contr+.5)*255*bright;
+    g=((g/255-.5)*contr+.5)*255*bright;
+    b=((b/255-.5)*contr+.5)*255*bright;
+    if(gamma!==1){
+      r=255*Math.pow(Math.max(0,r/255),gamma);
+      g=255*Math.pow(Math.max(0,g/255),gamma);
+      b=255*Math.pow(Math.max(0,b/255),gamma);
+    }
+    if(bw){const bwv=clamp(0.299*r+0.587*g+0.114*b);r=g=b=bwv;}
+    gradedP[i]=clamp(r);gradedP[i+1]=clamp(g);gradedP[i+2]=clamp(b);gradedP[i+3]=255;
+  }
+
+  // Sigmoid mask + person shape
+  const mask=new Float32Array(W*H);
+  for(let p=0;p<W*H;p++){
+    const i=p*4;
+    const lum=0.299*id[i]+0.587*id[i+1]+0.114*id[i+2];
+    const x=(thresh-lum)/feather;
+    let m=1.0/(1.0+Math.exp(-x));
+    if(personMask){
+      const pm=personMask[p];
+      m=m*(1-personShapeAmt + personShapeAmt*pm);
+    }
+    mask[p]=m;
+  }
+
+  const smooth=parseInt(document.getElementById('edgeSmooth').value);
+  const finalMask=smooth>0 ? blurMaskFloat(mask,W,H,smooth) : mask;
+
+  const out=ctx.createImageData(W,H);
+  const od=out.data;
+
+  for(let p=0;p<W*H;p++){
+    const i=p*4;
+    const m=finalMask[p];
+    if(exportModeNum===0){
+      if(invertMode && compositeMode==='inkMasksPerson'){
+        // Invert: dark ink on white, person as detail
+        const darkR=gradedP[i]*0.35, darkG=gradedP[i+1]*0.35, darkB=gradedP[i+2]*0.35;
+        od[i]=clamp(darkR); od[i+1]=clamp(darkG); od[i+2]=clamp(darkB);
+        od[i+3]=Math.round(m*255);
+      } else if(compositeMode==='personCutsInk'){
+        const inkLum=clamp(0.299*id[i]+0.587*id[i+1]+0.114*id[i+2]);
+        od[i]  =Math.round(m*gradedP[i]  +(1-m)*inkLum);
+        od[i+1]=Math.round(m*gradedP[i+1]+(1-m)*inkLum);
+        od[i+2]=Math.round(m*gradedP[i+2]+(1-m)*inkLum);
+        od[i+3]=255;
+      } else {
+        od[i]=gradedP[i];od[i+1]=gradedP[i+1];od[i+2]=gradedP[i+2];
+        od[i+3]=Math.round(m*255);
+      }
+    } else if(exportModeNum===1){
+      od[i]=invertMode?255:0;
+      od[i+1]=invertMode?255:0;
+      od[i+2]=invertMode?255:0;
+      od[i+3]=Math.round(m*255);
+    } else {
+      od[i]=gradedP[i];od[i+1]=gradedP[i+1];od[i+2]=gradedP[i+2];
+      od[i+3]=Math.round(m*255);
+    }
+  }
+
+  // POST-COMPOSITE TINT
+  if(!bw && tintStr>0){
+    for(let p=0;p<W*H;p++){
+      const i=p*4;
+      if(od[i+3]===0) continue;
+      const lum=0.299*od[i]+0.587*od[i+1]+0.114*od[i+2];
+      const darkness=1-(lum/255);
+      if(darkness<0.02) continue;
+      const px=p%W, py=Math.floor(p/W);
+      const[tr,tg,tb]=getTintForPixel(px,py,W,H,lum,rampLUT);
+      const strength=tintStr*darkness;
+      od[i]  =clamp(od[i]  +(tr-128)*strength*2);
+      od[i+1]=clamp(od[i+1]+(tg-128)*strength*2);
+      od[i+2]=clamp(od[i+2]+(tb-128)*strength*2);
+    }
+  }
+
+  // SCAN LINES
+  const scanOn=document.getElementById('scanToggle').classList.contains('on');
+  if(scanOn){
+    const spacing=parseInt(document.getElementById('scanSpacing').value);
+    const scanAlpha=parseInt(document.getElementById('scanOpacity').value)/100;
+    for(let y=0;y<H;y++){
+      if(y%spacing===0){
+        for(let x=0;x<W;x++){
+          const i=(y*W+x)*4;
+          od[i]  =Math.round(od[i]  *(1-scanAlpha));
+          od[i+1]=Math.round(od[i+1]*(1-scanAlpha));
+          od[i+2]=Math.round(od[i+2]*(1-scanAlpha));
+        }
+      }
+    }
+  }
+
+  ctx.putImageData(out,0,0);
+
+  // Center ink overlay for export
+  if(centerInkOn){
+    drawMirrored(iCtx,inkVideo,W,H,mirH,mirV,centerSpread);
+    const cid=iCtx.getImageData(0,0,W,H).data;
+    const overlay=ctx.createImageData(W,H);
+    const ov=overlay.data;
+    for(let p=0;p<W*H;p++){
+      const i=p*4;
+      const lum=0.299*cid[i]+0.587*cid[i+1]+0.114*cid[i+2];
+      const x=(thresh-lum)/feather;
+      const m=1.0/(1.0+Math.exp(-x));
+      ov[i]=0; ov[i+1]=0; ov[i+2]=0;
+      ov[i+3]=Math.round(m*centerOpacity*255);
+    }
+    const tmpC=document.createElement('canvas');
+    tmpC.width=W; tmpC.height=H;
+    tmpC.getContext('2d').putImageData(overlay,0,0);
+    ctx.drawImage(tmpC,0,0);
+    // Restore
+    drawMirrored(iCtx,inkVideo,W,H,mirH,mirV,expSpread);
+  }
+}
+
+// ── COLOR: SOLID + RAMP SYSTEM ─────────────────────────────────
+let tintMode='solid'; // 'solid' or 'ramp'
+let rampType='horizontal'; // 'horizontal','vertical','radial','luminance'
+let rampStops=[
+  {pos:0, hex:'#1A0A2E'},
+  {pos:0.4, hex:'#3D2B5A'},
+  {pos:0.7, hex:'#5C4A7A'},
+  {pos:1, hex:'#8B7BA5'}
+];
+let selectedStop=0;
+let draggingStop=-1;
+
+function hexToRgb(hex){
+  hex=hex.replace('#','');
+  if(hex.length===3) hex=hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+  return[parseInt(hex.slice(0,2),16),parseInt(hex.slice(2,4),16),parseInt(hex.slice(4,6),16)];
+}
+function rgbToHex(r,g,b){return '#'+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');}
+
+function setTintMode(mode){
+  tintMode=mode;
+  document.getElementById('tintSolid').classList.toggle('active',mode==='solid');
+  document.getElementById('tintRamp').classList.toggle('active',mode==='ramp');
+  document.getElementById('solidControls').style.display=mode==='solid'?'block':'none';
+  document.getElementById('rampControls').style.display=mode==='ramp'?'block':'none';
+  updatePreview();
+}
+
+function setRampType(t){
+  rampType=t;
+  ['rampH','rampV','rampR','rampL'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  const map={horizontal:'rampH',vertical:'rampV',radial:'rampR',luminance:'rampL'};
+  document.getElementById(map[t]).classList.add('active');
+  updatePreview();
+}
+
+// Sample gradient at position t (0-1)
+function sampleRamp(t){
+  t=Math.max(0,Math.min(1,t));
+  const sorted=[...rampStops].sort((a,b)=>a.pos-b.pos);
+  if(t<=sorted[0].pos) return hexToRgb(sorted[0].hex);
+  if(t>=sorted[sorted.length-1].pos) return hexToRgb(sorted[sorted.length-1].hex);
+  for(let i=0;i<sorted.length-1;i++){
+    if(t>=sorted[i].pos && t<=sorted[i+1].pos){
+      const f=(t-sorted[i].pos)/(sorted[i+1].pos-sorted[i].pos);
+      const a=hexToRgb(sorted[i].hex), b=hexToRgb(sorted[i+1].hex);
+      return[
+        Math.round(a[0]+(b[0]-a[0])*f),
+        Math.round(a[1]+(b[1]-a[1])*f),
+        Math.round(a[2]+(b[2]-a[2])*f)
+      ];
+    }
+  }
+  return hexToRgb(sorted[sorted.length-1].hex);
+}
+
+// Pre-build a 256-entry LUT for fast ramp sampling
+function buildRampLUT(){
+  const lut=new Uint8Array(256*3);
+  for(let i=0;i<256;i++){
+    const [r,g,b]=sampleRamp(i/255);
+    lut[i*3]=r; lut[i*3+1]=g; lut[i*3+2]=b;
+  }
+  return lut;
+}
+
+// Get tint color for a pixel — solid or ramp
+function getTintForPixel(px,py,W,H,pixLum,rampLUT){
+  if(tintMode==='solid'){
+    return[solidTintR,solidTintG,solidTintB];
+  }
+  let t=0;
+  if(rampType==='horizontal') t=px/Math.max(1,W-1);
+  else if(rampType==='vertical') t=py/Math.max(1,H-1);
+  else if(rampType==='radial'){
+    const cx=W/2, cy=H/2;
+    const dx=px-cx, dy=py-cy;
+    const maxDist=Math.sqrt(cx*cx+cy*cy);
+    t=Math.sqrt(dx*dx+dy*dy)/maxDist;
+  } else { // luminance
+    t=pixLum/255;
+  }
+  const idx=Math.max(0,Math.min(255,Math.round(t*255)))*3;
+  return[rampLUT[idx],rampLUT[idx+1],rampLUT[idx+2]];
+}
+
+let solidTintR=124, solidTintG=92, solidTintB=191;
+
+// ── RAMP BAR DRAWING ──────────────────────────────────────────
+function drawRampBar(){
+  const c=document.getElementById('rampBar');
+  if(!c)return;
+  const ctx=c.getContext('2d');
+  const w=c.width, h=c.height;
+  const sorted=[...rampStops].sort((a,b)=>a.pos-b.pos);
+  const grad=ctx.createLinearGradient(0,0,w,0);
+  sorted.forEach(s=>grad.addColorStop(s.pos,s.hex));
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,w,h);
+}
+
+function drawRampStopMarkers(){
+  const c=document.getElementById('rampStops');
+  if(!c)return;
+  const ctx=c.getContext('2d');
+  const w=c.width, h=c.height;
+  ctx.clearRect(0,0,w,h);
+  rampStops.forEach((s,i)=>{
+    const x=s.pos*w;
+    ctx.beginPath();
+    ctx.moveTo(x,0);ctx.lineTo(x-5,h);ctx.lineTo(x+5,h);ctx.closePath();
+    ctx.fillStyle=i===selectedStop?'#fff':s.hex;
+    ctx.fill();
+    ctx.strokeStyle=i===selectedStop?'var(--accent)':'#555';
+    ctx.lineWidth=i===selectedStop?2:1;
+    ctx.stroke();
+  });
+}
+
+function updateRampUI(){
+  drawRampBar();
+  drawRampStopMarkers();
+  if(rampStops[selectedStop]){
+    const s=rampStops[selectedStop];
+    document.getElementById('rampHexInput').value=s.hex;
+    document.getElementById('rampColorPicker').value=s.hex;
+  }
+}
+
+function applyRampHex(val){
+  val=val.trim();
+  if(!/^#[0-9a-fA-F]{6}$/.test(val)) return;
+  if(rampStops[selectedStop]){
+    rampStops[selectedStop].hex=val.toUpperCase();
+    document.getElementById('rampHexInput').value=val.toUpperCase();
+    document.getElementById('rampColorPicker').value=val;
+    updateRampUI();
+    updatePreview();
+  }
+}
+
+function deleteRampStop(){
+  if(rampStops.length<=2) return;
+  rampStops.splice(selectedStop,1);
+  selectedStop=Math.min(selectedStop,rampStops.length-1);
+  updateRampUI();
+  updatePreview();
+}
+
+// Ramp bar interactions
+document.getElementById('rampBar').addEventListener('mousedown',e=>{
+  const rect=e.target.getBoundingClientRect();
+  const pos=(e.clientX-rect.left)/rect.width;
+  // Check if near existing stop
+  const nearIdx=rampStops.findIndex(s=>Math.abs(s.pos-pos)<0.03);
+  if(nearIdx>=0){
+    selectedStop=nearIdx;
+    draggingStop=nearIdx;
+  } else {
+    // Add new stop
+    const[r,g,b]=sampleRamp(pos);
+    rampStops.push({pos:Math.max(0,Math.min(1,pos)),hex:rgbToHex(r,g,b)});
+    selectedStop=rampStops.length-1;
+    draggingStop=selectedStop;
+  }
+  updateRampUI();
+  updatePreview();
+});
+
+document.getElementById('rampStops').addEventListener('mousedown',e=>{
+  const rect=e.target.getBoundingClientRect();
+  const pos=(e.clientX-rect.left)/rect.width;
+  const nearIdx=rampStops.findIndex(s=>Math.abs(s.pos-pos)<0.04);
+  if(nearIdx>=0){
+    selectedStop=nearIdx;
+    draggingStop=nearIdx;
+    updateRampUI();
+  }
+});
+
+window.addEventListener('mousemove',e=>{
+  if(draggingStop<0)return;
+  const bar=document.getElementById('rampBar');
+  const rect=bar.getBoundingClientRect();
+  const pos=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
+  rampStops[draggingStop].pos=pos;
+  updateRampUI();
+  updatePreview();
+});
+
+window.addEventListener('mouseup',()=>{draggingStop=-1;});
+
+// ── COLOR WHEEL (solid mode) ──────────────────────────────────
+function drawColorWheel(){
+  const wc=document.getElementById('colorWheel');
+  const wx=wc.getContext('2d');
+  const cx=34,cy=34,r=32;
+  for(let a=0;a<360;a++){
+    const s=(a-1)*Math.PI/180, e=(a+1)*Math.PI/180;
+    const g=wx.createRadialGradient(cx,cy,0,cx,cy,r);
+    g.addColorStop(0,`hsl(${a},0%,100%)`);
+    g.addColorStop(1,`hsl(${a},100%,50%)`);
+    wx.beginPath();wx.moveTo(cx,cy);wx.arc(cx,cy,r,s,e);wx.closePath();
+    wx.fillStyle=g;wx.fill();
+  }
+}
+
+function updateSolidFromHSL(){
+  const[r,g,b]=hslToRgb(tintH/360,tintS,0.5);
+  solidTintR=r; solidTintG=g; solidTintB=b;
+  const hex=rgbToHex(r,g,b);
+  document.getElementById('hexVal').textContent=hex;
+  document.getElementById('hexInput').value=hex;
+  document.getElementById('solidColorPicker').value=hex;
+  document.getElementById('colorPreview').style.background=`rgb(${r},${g},${b})`;
+}
+
+function pickColor(e){
+  const wc=document.getElementById('colorWheel');
+  const rect=wc.getBoundingClientRect();
+  const x=e.clientX-rect.left-34, y=e.clientY-rect.top-34;
+  const dist=Math.sqrt(x*x+y*y);
+  if(dist>34)return;
+  tintH=((Math.atan2(y,x)*180/Math.PI)+360)%360;
+  tintS=Math.min(1,dist/34);
+  document.getElementById('wheelCursor').style.left=(x+34)+'px';
+  document.getElementById('wheelCursor').style.top=(y+34)+'px';
+  updateSolidFromHSL();
+  updatePreview();
+}
+
+function applyHexInput(val){
+  val=val.trim();
+  if(!/^#[0-9a-fA-F]{6}$/.test(val)) return;
+  const[r,g,b]=hexToRgb(val);
+  solidTintR=r; solidTintG=g; solidTintB=b;
+  const max=Math.max(r,g,b)/255, min=Math.min(r,g,b)/255;
+  const l=(max+min)/2;
+  const s=max===min?0:(l>0.5?(max-min)/(2-max-min):(max-min)/(max+min));
+  let h=0;
+  if(max!==min){
+    const d=max-min, rm=r/255,gm=g/255,bm=b/255;
+    if(rm===max) h=((gm-bm)/d+(gm<bm?6:0))/6;
+    else if(gm===max) h=((bm-rm)/d+2)/6;
+    else h=((rm-gm)/d+4)/6;
+  }
+  tintH=h*360; tintS=s;
+  const angle=tintH*Math.PI/180, dist=tintS*34;
+  document.getElementById('wheelCursor').style.left=(34+Math.cos(angle)*dist)+'px';
+  document.getElementById('wheelCursor').style.top=(34+Math.sin(angle)*dist)+'px';
+  document.getElementById('hexVal').textContent=val.toUpperCase();
+  document.getElementById('hexInput').value=val.toUpperCase();
+  document.getElementById('solidColorPicker').value=val;
+  document.getElementById('colorPreview').style.background=`rgb(${r},${g},${b})`;
+  updatePreview();
+}
+
+document.getElementById('colorWheel').addEventListener('mousedown',e=>{
+  pickColor(e);
+  const mv=ev=>pickColor(ev);
+  const up=()=>{window.removeEventListener('mousemove',mv);window.removeEventListener('mouseup',up);};
+  window.addEventListener('mousemove',mv);window.addEventListener('mouseup',up);
+});
+
+function hslToRgb(h,s,l){
+  let r,g,b;
+  if(s===0){r=g=b=l;}
+  else{
+    const q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;
+    const f=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;};
+    r=f(p,q,h+1/3);g=f(p,q,h);b=f(p,q,h-1/3);
+  }
+  return[Math.round(r*255),Math.round(g*255),Math.round(b*255)];
+}
+
+function clamp(v){return Math.max(0,Math.min(255,Math.round(v)));}
+
+// Get ramp data for settings export
+function getRampExportString(){
+  if(tintMode==='solid'){
+    return `Mode: Solid | Hex: ${rgbToHex(solidTintR,solidTintG,solidTintB)}`;
+  }
+  const sorted=[...rampStops].sort((a,b)=>a.pos-b.pos);
+  const stopStr=sorted.map(s=>`${s.hex}@${s.pos.toFixed(3)}`).join(', ');
+  return `Mode: Ramp | Type: ${rampType} | Stops: ${stopStr}`;
+}
+
+// Load Gnarls Barkley "Crazy" video preset
+function loadCrazyPreset(){
+  // Invert mode on
+  document.getElementById('invertToggle').classList.add('on');
+  // B&W on (the Crazy video uses monochrome person footage tinted via ramp)
+  document.getElementById('bwToggle').classList.add('on');
+  toggleBW();
+  // Ramp mode with luminance mapping — dark areas get deep purple, light areas stay clean
+  setTintMode('ramp');
+  setRampType('luminance');
+  // Purple/gray palette matching the Crazy video's ink gradient
+  rampStops=[
+    {pos:0, hex:'#1A0A2E'},
+    {pos:0.3, hex:'#3D2B5A'},
+    {pos:0.6, hex:'#5C4A7A'},
+    {pos:1, hex:'#C8C0D4'}
+  ];
+  selectedStop=0;
+  updateRampUI();
+  // Tint is now post-composite — lower strength for subtle color
+  document.getElementById('tintStrength').value=25;
+  updateVal('tintVal','25%');
+  // High contrast, slightly bright, gamma boost
+  document.getElementById('contrast').value=160;
+  updateVal('contrastVal','1.6');
+  document.getElementById('brightness').value=110;
+  updateVal('brightnessVal','1.1');
+  document.getElementById('gamma').value=80;
+  updateVal('gammaVal','0.8');
+  // Desaturate fully
+  document.getElementById('saturation').value=100;
+  updateVal('satVal','100%');
+  // White paper bg
+  document.getElementById('bgToggle').classList.add('on');
+  // Edge falloff slightly softer for organic ink feel
+  document.getElementById('edgeFeather').value=5;
+  updateVal('featherVal','5');
+  // Smooth out fine detail into flowing curves
+  document.getElementById('edgeSmooth').value=3;
+  updateVal('smoothVal','3');
+  updatePreview();
+}
+
+// ── INIT ───────────────────────────────────────────────────────
+drawColorWheel();
+const initAngle=270*Math.PI/180, initDist=0.6*34;
+document.getElementById('wheelCursor').style.left=(34+Math.cos(initAngle)*initDist)+'px';
+document.getElementById('wheelCursor').style.top= (34+Math.sin(initAngle)*initDist)+'px';
+tintH=270; tintS=0.6;
+updateSolidFromHSL();
+updateRampUI();
+</script>
 </body>
 </html>
