@@ -1,858 +1,195 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>INKFORM — Rorschach Compositor</title>
+<title>Ink Rorschach Compositor</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400&display=swap');
-  :root{--ink:#0a0a0f;--paper:#f5f2ed;--accent:#7c5cbf;--gray:#777;}
-  *{margin:0;padding:0;box-sizing:border-box;}
-  body{background:var(--ink);color:var(--paper);font-family:'IBM Plex Mono',monospace;min-height:100vh;overflow-x:hidden;}
-  header{display:flex;align-items:baseline;gap:16px;padding:20px 36px 16px;border-bottom:1px solid #222;}
-  header h1{font-family:'Bebas Neue',sans-serif;font-size:2.4rem;letter-spacing:.12em;color:var(--paper);}
-  header span{font-size:.62rem;color:var(--gray);letter-spacing:.2em;text-transform:uppercase;}
-  .layout{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - 65px);}
-  .sidebar{border-right:1px solid #222;padding:18px;overflow-y:auto;display:flex;flex-direction:column;gap:20px;}
-  .slabel{font-size:.55rem;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;}
-  .upload-zone{border:1px dashed #333;border-radius:3px;padding:14px;text-align:center;cursor:pointer;transition:all .2s;position:relative;background:#0d0d14;}
-  .upload-zone:hover,.upload-zone.drag-over{border-color:var(--accent);background:#131320;}
-  .upload-zone.has-file{border-color:#3a3a5c;border-style:solid;}
-  .upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
-  .upload-icon{font-size:1.3rem;margin-bottom:5px;opacity:.4;}
-  .upload-zone p{font-size:.6rem;color:var(--gray);line-height:1.5;}
-  .upload-zone .fname{color:var(--paper);font-size:.62rem;margin-top:3px;word-break:break-all;}
-  .cg{display:flex;flex-direction:column;gap:12px;}
-  .cr{display:flex;flex-direction:column;gap:4px;}
-  .cr label{display:flex;justify-content:space-between;font-size:.6rem;color:var(--gray);}
-  .cr label span{color:var(--paper);}
-  input[type=range]{-webkit-appearance:none;width:100%;height:2px;background:#333;outline:none;border-radius:1px;}
-  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:var(--accent);cursor:pointer;}
-  .tr{display:flex;justify-content:space-between;align-items:center;font-size:.6rem;color:var(--gray);}
-  .tog{width:32px;height:16px;background:#333;border-radius:8px;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0;}
-  .tog.on{background:var(--accent);}
-  .tog::after{content:'';position:absolute;width:10px;height:10px;border-radius:50%;background:white;top:3px;left:3px;transition:left .2s;}
-  .tog.on::after{left:19px;}
-  .mode-pills{display:flex;gap:1px;background:#1a1a26;border-radius:3px;overflow:hidden;}
-  .mpill{flex:1;padding:6px 3px;background:transparent;border:none;color:var(--gray);font-family:'IBM Plex Mono',monospace;font-size:.5rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all .2s;text-align:center;}
-  .mpill.active{background:#2a2a40;color:var(--paper);}
-  .mpill:hover:not(.active){color:var(--paper);}
-  /* color wheel */
-  .wheel-wrap{display:flex;align-items:center;gap:12px;}
-  .wheel-rel{position:relative;width:68px;height:68px;flex-shrink:0;cursor:crosshair;}
-  #colorWheel{border-radius:50%;display:block;width:68px;height:68px;}
-  .wcursor{position:absolute;width:8px;height:8px;border-radius:50%;border:2px solid white;pointer-events:none;transform:translate(-50%,-50%);box-shadow:0 0 4px rgba(0,0,0,.9);top:50%;left:50%;}
-  .wheel-sliders{flex:1;display:flex;flex-direction:column;gap:8px;}
-  .cprev{width:100%;height:12px;border-radius:2px;border:1px solid #333;margin-top:2px;}
-  /* export */
-  .etabs{display:flex;gap:1px;background:#1a1a26;border-radius:3px;overflow:hidden;}
-  .etab{flex:1;padding:7px 3px;background:transparent;border:none;color:var(--gray);font-family:'IBM Plex Mono',monospace;font-size:.5rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all .2s;text-align:center;}
-  .etab.active{background:var(--accent);color:white;}
-  .etab:hover:not(.active){color:var(--paper);}
-  .enote{font-size:.55rem;color:var(--gray);line-height:1.5;padding:6px 8px;background:#0d0d14;border-radius:2px;border-left:2px solid #2a2a40;}
-  .seq-progress{width:100%;height:3px;background:#222;border-radius:2px;overflow:hidden;display:none;}
-  .seq-fill{height:100%;background:var(--accent);width:0%;}
-  .seq-info{font-size:.55rem;color:var(--gray);display:none;}
-  .btn-process{width:100%;padding:12px;background:var(--accent);color:white;border:none;font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:.2em;cursor:pointer;border-radius:2px;transition:background .2s,transform .1s;margin-top:4px;}
-  .btn-process:hover{background:#9070d8;}
-  .btn-process:active{transform:scale(.98);}
-  .btn-process:disabled{background:#333;color:#555;cursor:not-allowed;}
-  .btn-exp{width:100%;padding:9px;background:transparent;color:var(--accent);border:1px solid var(--accent);font-family:'IBM Plex Mono',monospace;font-size:.58rem;letter-spacing:.12em;cursor:pointer;border-radius:2px;transition:all .2s;text-transform:uppercase;display:none;}
-  .btn-exp:hover{background:var(--accent);color:white;}
-  /* preview */
-  .preview-area{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;gap:14px;background:#050508;position:relative;}
-  .canvas-wrap{position:relative;display:flex;align-items:center;justify-content:center;width:100%;max-width:680px;}
-  canvas{max-width:100%;border:1px solid #1a1a2e;display:block;border-radius:2px;}
-  .checker{background-image:linear-gradient(45deg,#1e1e1e 25%,transparent 25%),linear-gradient(-45deg,#1e1e1e 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#1e1e1e 75%),linear-gradient(-45deg,transparent 75%,#1e1e1e 75%);background-size:14px 14px;background-position:0 0,0 7px,7px -7px,-7px 0px;border-radius:2px;padding:1px;}
-  #placeholder{width:640px;height:360px;border:1px dashed #222;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border-radius:2px;max-width:100%;}
-  #placeholder .big{font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:.2em;color:#2a2a3a;}
-  #placeholder p{font-size:.56rem;letter-spacing:.15em;text-transform:uppercase;color:#333;}
-  .playback{display:flex;gap:10px;align-items:center;}
-  .btn-play{background:none;border:1px solid #333;color:var(--paper);font-family:'IBM Plex Mono',monospace;font-size:.6rem;padding:7px 16px;cursor:pointer;letter-spacing:.12em;text-transform:uppercase;border-radius:2px;transition:all .2s;display:none;}
-  .btn-play:hover{border-color:var(--accent);color:var(--accent);}
-  .progbar{width:180px;height:2px;background:#222;border-radius:1px;overflow:hidden;display:none;}
-  .progfill{height:100%;background:var(--accent);width:0%;}
-  .timedis{font-size:.58rem;color:var(--gray);display:none;}
-  .statusbar{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);font-size:.56rem;letter-spacing:.2em;text-transform:uppercase;color:var(--gray);white-space:nowrap;}
-  .desc{font-size:.58rem;color:var(--gray);line-height:1.6;padding:6px 8px;background:#0a0a14;border-radius:2px;border-left:2px solid #2a2a40;}
+body{
+  margin:0;
+  background:#111;
+  color:white;
+  font-family:sans-serif;
+  display:flex;
+  height:100vh;
+}
+#controls{
+  width:320px;
+  padding:15px;
+  overflow-y:auto;
+  background:#1a1a1a;
+}
+#viewer{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+}
+canvas{
+  flex:1;
+  background:black;
+}
+video{
+  width:220px;
+  position:absolute;
+  bottom:20px;
+  right:20px;
+  border:1px solid #444;
+}
+input[type=range]{ width:100%; }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
-<header>
-  <h1>INKFORM</h1>
-  <span>Rorschach Compositor v2</span>
-</header>
-<div class="layout">
-<div class="sidebar">
 
-  <div>
-    <div class="slabel">01 — Person Plate</div>
-    <div class="upload-zone" id="plateZone">
-      <input type="file" id="plateInput" accept="video/*">
-      <div class="upload-icon">◈</div><p>Drop subject video</p>
-      <div class="fname" id="plateName"></div>
-    </div>
-  </div>
+<div id="controls">
+<h3>Upload</h3>
+<input type="file" id="personUpload"><br><br>
+<input type="file" id="inkUpload"><br><br>
 
-  <div>
-    <div class="slabel">02 — Ink Blot Footage</div>
-    <div class="upload-zone" id="inkZone">
-      <input type="file" id="inkInput" accept="video/*">
-      <div class="upload-icon">◉</div><p>Drop ink blot video</p>
-      <div class="fname" id="inkName"></div>
-    </div>
-  </div>
+<h3>Zoom</h3>
+Zoom <input type="range" id="zoom" min="0.5" max="2" step="0.01" value="1"><br>
 
-  <div>
-    <div class="slabel">03 — Mirror</div>
-    <div class="cg">
-      <div class="tr"><span>Horizontal (Rorschach)</span><div class="tog on" id="mirrorH" onclick="this.classList.toggle('on');updatePreview()"></div></div>
-      <div class="tr"><span>Vertical</span><div class="tog" id="mirrorV" onclick="this.classList.toggle('on');updatePreview()"></div></div>
-    </div>
-  </div>
+<h3>Mask</h3>
+Threshold <input type="range" id="threshold" min="0" max="1" step="0.01" value="0.5"><br>
+Softness <input type="range" id="softness" min="0" max="0.5" step="0.01" value="0.1"><br>
 
-  <div>
-    <div class="slabel">04 — Composite Mode</div>
-    <div class="cg">
-      <div class="mode-pills">
-        <button class="mpill active" id="modeA" onclick="setMode('inkMasksPerson')">Ink → Person</button>
-        <button class="mpill" id="modeB" onclick="setMode('personCutsInk')">Person → Ink</button>
-        <button class="mpill" id="modeC" onclick="setMode('sideBySide')">Split</button>
-      </div>
-      <div class="desc" id="modeDesc">Ink shape reveals person. Outside ink = background (transparent on export).</div>
-      <div class="cr">
-        <label>Ink threshold <span id="threshVal">110</span></label>
-        <input type="range" id="inkThresh" min="0" max="255" value="110" oninput="updateVal('threshVal',this.value);updatePreview()">
-      </div>
-      <div class="cr">
-        <label>Edge feather <span id="featherVal">0px</span></label>
-        <input type="range" id="edgeFeather" min="0" max="20" value="0" oninput="updateVal('featherVal',this.value+'px');updatePreview()">
-      </div>
-    </div>
-  </div>
+<h3>Position</h3>
+Horizontal <input type="range" id="offsetX" min="-1" max="1" step="0.01" value="0"><br>
+Vertical <input type="range" id="offsetY" min="-1" max="1" step="0.01" value="0"><br>
 
-  <div>
-    <div class="slabel">05 — Color</div>
-    <div class="cg">
-      <div class="tr">
-        <span>Black &amp; White</span>
-        <div class="tog" id="bwToggle" onclick="this.classList.toggle('on');toggleBW();updatePreview()"></div>
-      </div>
-      <div id="colorControls">
-        <div class="wheel-wrap">
-          <div class="wheel-rel" id="wheelWrap">
-            <canvas id="colorWheel" width="68" height="68"></canvas>
-            <div class="wcursor" id="wheelCursor"></div>
-          </div>
-          <div class="wheel-sliders">
-            <div class="cr">
-              <label>Tint strength <span id="tintVal">40%</span></label>
-              <input type="range" id="tintStrength" min="0" max="100" value="40" oninput="updateVal('tintVal',this.value+'%');updatePreview()">
-            </div>
-            <div class="cr">
-              <label>Desaturate <span id="satVal">65%</span></label>
-              <input type="range" id="saturation" min="0" max="100" value="65" oninput="updateVal('satVal',this.value+'%');updatePreview()">
-            </div>
-            <div class="cprev" id="colorPreview"></div>
-          </div>
-        </div>
-      </div>
-      <div class="cr">
-        <label>Contrast <span id="contrastVal">1.3</span></label>
-        <input type="range" id="contrast" min="50" max="250" value="130" oninput="updateVal('contrastVal',(this.value/100).toFixed(1));updatePreview()">
-      </div>
-      <div class="cr">
-        <label>Brightness <span id="brightnessVal">1.0</span></label>
-        <input type="range" id="brightness" min="40" max="160" value="100" oninput="updateVal('brightnessVal',(this.value/100).toFixed(1));updatePreview()">
-      </div>
-    </div>
-  </div>
+<h3>Seam</h3>
+Width <input type="range" id="seamWidth" min="0" max="0.5" step="0.01" value="0.05"><br>
+<label><input type="checkbox" id="seamInk"> Ink Seam</label><br>
 
-  <div>
-    <div class="slabel">06 — Background</div>
-    <div class="cg">
-      <div class="tr"><span>White paper</span><div class="tog on" id="bgToggle" onclick="this.classList.toggle('on');updatePreview()"></div></div>
-      <div class="tr"><span>Preview alpha (checkerboard)</span><div class="tog" id="alphaToggle" onclick="this.classList.toggle('on');toggleAlphaBg();updatePreview()"></div></div>
-    </div>
-  </div>
+<h3>Outline Ink</h3>
+Outline Strength <input type="range" id="outlineStrength" min="0" max="3" step="0.1" value="1"><br>
 
-  <div>
-    <div class="slabel">07 — Export</div>
-    <div class="cg">
-      <div class="etabs">
-        <button class="etab active" id="tab0" onclick="setExportMode(0)">Composite</button>
-        <button class="etab" id="tab1" onclick="setExportMode(1)">Ink Only</button>
-        <button class="etab" id="tab2" onclick="setExportMode(2)">Person Only</button>
-      </div>
-      <div class="enote" id="exportNote">Full composite · transparent background · alpha PNG</div>
-      <div class="cr">
-        <label>Sequence FPS <span id="fpsVal">24</span></label>
-        <input type="range" id="exportFps" min="12" max="30" value="24" step="1" oninput="updateVal('fpsVal',this.value)">
-      </div>
-      <div class="seq-progress" id="seqProgress"><div class="seq-fill" id="seqFill"></div></div>
-      <div class="seq-info" id="seqInfo"></div>
-      <button class="btn-exp" id="exportFrameBtn" onclick="exportCurrentFrame()">↓ Export Frame (PNG + α)</button>
-      <button class="btn-exp" id="exportSeqBtn" onclick="exportSequence()">↓ Export PNG Sequence → Choose Folder</button>
-      <button class="btn-exp" id="exportSettingsBtn" onclick="exportSettings()">↓ Export Settings (TXT)</button>
-    </div>
-  </div>
-
-  <button class="btn-process" id="processBtn" onclick="processVideo()" disabled>PROCESS COMPOSITE</button>
-
+<h3>Ramp</h3>
+Strength <input type="range" id="rampStrength" min="0" max="2" step="0.01" value="1"><br>
+<label><input type="checkbox" id="rampMasked"> Ramp Only Inside Mask</label><br>
 </div>
 
-<!-- PREVIEW -->
-<div class="preview-area" id="previewArea">
-  <div class="canvas-wrap" id="canvasWrap">
-    <div id="placeholder">
-      <div class="big">LOAD FOOTAGE</div>
-      <p>Upload both videos to begin</p>
-    </div>
-    <canvas id="outputCanvas" style="display:none"></canvas>
-  </div>
-  <div class="playback">
-    <button class="btn-play" id="playBtn" onclick="togglePlay()">▶ Play</button>
-    <div class="progbar" id="progBar"><div class="progfill" id="progFill"></div></div>
-    <div class="timedis" id="timeDis">0:00 / 0:00</div>
-  </div>
-  <div class="statusbar" id="statusBar">AWAITING INPUT</div>
+<div id="viewer">
+<canvas id="canvas"></canvas>
+<video id="personVideo" autoplay loop muted></video>
+<video id="inkVideo" autoplay loop muted style="display:none;"></video>
 </div>
-</div>
-
-<video id="plateVideo" style="display:none" crossorigin="anonymous" loop playsinline></video>
-<video id="inkVideo"   style="display:none" crossorigin="anonymous" loop playsinline></video>
-<canvas id="wkPlate" style="display:none"></canvas>
-<canvas id="wkInk"   style="display:none"></canvas>
 
 <script>
-// ── STATE ──────────────────────────────────────────────────────
-let plateReady=false, inkReady=false, isPlaying=false, processed=false, isExporting=false;
-let animFrame=null, compositeMode='inkMasksPerson', exportModeNum=0;
-let tintH=270, tintS=0.6;
-let plateBaseName='person', inkBaseName='ink';
-function stripExt(n){return n.replace(/\.[^/.]+$/,'').replace(/[^a-zA-Z0-9_\-]/g,'_').slice(0,40);}
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d",{willReadFrequently:true});
 
-const plateVideo = document.getElementById('plateVideo');
-const inkVideo   = document.getElementById('inkVideo');
-const outCanvas  = document.getElementById('outputCanvas');
-const wkPlate    = document.getElementById('wkPlate');
-const wkInk      = document.getElementById('wkInk');
-const outCtx = outCanvas.getContext('2d',{willReadFrequently:true});
-const pCtx   = wkPlate.getContext('2d',  {willReadFrequently:true});
-const iCtx   = wkInk.getContext('2d',    {willReadFrequently:true});
+const personVideo = document.getElementById("personVideo");
+const inkVideo = document.getElementById("inkVideo");
 
-// ── UPLOADS ────────────────────────────────────────────────────
-function setupUpload(inputId,zoneId,nameId,videoEl,flag){
-  const input=document.getElementById(inputId);
-  const zone=document.getElementById(zoneId);
-  const nameEl=document.getElementById(nameId);
-  input.addEventListener('change',e=>{
-    const file=e.target.files[0]; if(!file)return;
-    videoEl.src=URL.createObjectURL(file); videoEl.load();
-    nameEl.textContent=file.name; zone.classList.add('has-file');
-    if(flag==='plate') plateBaseName=stripExt(file.name);
-    if(flag==='ink')   inkBaseName=stripExt(file.name);
-    videoEl.addEventListener('loadeddata',()=>{
-      if(flag==='plate')plateReady=true; if(flag==='ink')inkReady=true; checkReady();
-    },{once:true});
-  });
-  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag-over');});
-  zone.addEventListener('dragleave',()=>zone.classList.remove('drag-over'));
-  zone.addEventListener('drop',e=>{
-    e.preventDefault(); zone.classList.remove('drag-over');
-    const file=e.dataTransfer.files[0];
-    if(file&&file.type.startsWith('video/')){input.files=e.dataTransfer.files;input.dispatchEvent(new Event('change'));}
-  });
+const zoom = document.getElementById("zoom");
+const threshold = document.getElementById("threshold");
+const softness = document.getElementById("softness");
+const offsetX = document.getElementById("offsetX");
+const offsetY = document.getElementById("offsetY");
+const seamWidth = document.getElementById("seamWidth");
+const seamInk = document.getElementById("seamInk");
+const outlineStrength = document.getElementById("outlineStrength");
+const rampStrength = document.getElementById("rampStrength");
+const rampMasked = document.getElementById("rampMasked");
+
+function resize(){
+  canvas.width = window.innerWidth - 320;
+  canvas.height = window.innerHeight;
 }
-setupUpload('plateInput','plateZone','plateName',plateVideo,'plate');
-setupUpload('inkInput','inkZone','inkName',inkVideo,'ink');
+window.onresize = resize;
+resize();
 
-function checkReady(){
-  if(plateReady&&inkReady){
-    document.getElementById('processBtn').disabled=false;
-    document.getElementById('statusBar').textContent='READY — CLICK PROCESS';
-  }
+personUpload.onchange = e=>{
+  personVideo.src = URL.createObjectURL(e.target.files[0]);
+}
+inkUpload.onchange = e=>{
+  inkVideo.src = URL.createObjectURL(e.target.files[0]);
 }
 
-// ── PROCESS ────────────────────────────────────────────────────
-function processVideo(){
-  if(!plateReady||!inkReady)return;
-  const W=plateVideo.videoWidth||640, H=plateVideo.videoHeight||360;
-  [outCanvas,wkPlate,wkInk].forEach(c=>{c.width=W;c.height=H;});
-  document.getElementById('placeholder').style.display='none';
-  outCanvas.style.display='block';
-  plateVideo.currentTime=0; inkVideo.currentTime=0;
-  processed=true;
-  if(animFrame)cancelAnimationFrame(animFrame);
-  animFrame=requestAnimationFrame(renderLoop);
-  document.getElementById('playBtn').style.display='inline-block';
-  document.getElementById('progBar').style.display='block';
-  document.getElementById('timeDis').style.display='block';
-  document.getElementById('exportFrameBtn').style.display='block';
-  document.getElementById('exportSeqBtn').style.display='block';
-  document.getElementById('exportSettingsBtn').style.display='block';
-  document.getElementById('statusBar').textContent='PRESS PLAY TO ANIMATE';
+function smoothstep(a,b,x){
+  let t=Math.min(Math.max((x-a)/(b-a),0),1);
+  return t*t*(3-2*t);
 }
 
-// ── RENDER LOOP ────────────────────────────────────────────────
-function renderLoop(){
-  if(!processed)return;
-  draw(outCtx, outCanvas.width, outCanvas.height, false);
-  if(isPlaying){
-    const dur=plateVideo.duration||1, t=plateVideo.currentTime;
-    document.getElementById('progFill').style.width=(t/dur*100)+'%';
-    const fmt=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
-    document.getElementById('timeDis').textContent=`${fmt(t)} / ${fmt(dur)}`;
-  }
-  animFrame=requestAnimationFrame(renderLoop);
+function render(){
+if(personVideo.readyState>=2 && inkVideo.readyState>=2){
+
+let w=canvas.width;
+let h=canvas.height;
+
+ctx.clearRect(0,0,w,h);
+
+// draw person with zoom + offset
+ctx.save();
+ctx.translate(w/2,h/2);
+ctx.scale(zoom.value,zoom.value);
+ctx.drawImage(
+  personVideo,
+  -w/2 + offsetX.value*w,
+  -h/2 + offsetY.value*h,
+  w,
+  h
+);
+ctx.restore();
+
+let personData=ctx.getImageData(0,0,w,h);
+ctx.clearRect(0,0,w,h);
+
+ctx.drawImage(inkVideo,0,0,w,h);
+let inkData=ctx.getImageData(0,0,w,h);
+ctx.clearRect(0,0,w,h);
+
+let output=ctx.createImageData(w,h);
+
+for(let y=0;y<h;y++){
+for(let x=0;x<w;x++){
+
+let mirrorX=Math.abs(x-w/2)+w/2;
+if(mirrorX>=w) mirrorX=w-1;
+
+let i=(y*w+x)*4;
+let mi=(y*w+mirrorX)*4;
+
+let lum=(inkData.data[i]*0.299+
+         inkData.data[i+1]*0.587+
+         inkData.data[i+2]*0.114)/255;
+
+let mask=smoothstep(
+  threshold.value-softness.value,
+  threshold.value+softness.value,
+  lum
+);
+
+// seam fade
+let seamDist=Math.abs(x-w/2)/w;
+let seamFade=1-smoothstep(0,seamWidth.value,seamDist);
+if(seamInk.checked) mask*= (1-seamFade);
+
+// outline ink
+let edge=Math.abs(mask - smoothstep(
+  threshold.value-softness.value,
+  threshold.value+softness.value,
+  lum+0.02
+));
+mask += edge * outlineStrength.value;
+
+// ramp
+let ramp=1+rampStrength.value*(y/h);
+if(rampMasked.checked) ramp=1+rampStrength.value*(y/h)*mask;
+
+output.data[i]=personData.data[mi]*mask*ramp;
+output.data[i+1]=personData.data[mi+1]*mask*ramp;
+output.data[i+2]=personData.data[mi+2]*mask*ramp;
+output.data[i+3]=255;
+}
 }
 
-// ── CORE DRAW ──────────────────────────────────────────────────
-// alphaOnly=true → output has transparent bg regardless of bgToggle
-function draw(ctx, W, H, alphaOnly){
-  const mirH   = document.getElementById('mirrorH').classList.contains('on');
-  const mirV   = document.getElementById('mirrorV').classList.contains('on');
-  const bw     = document.getElementById('bwToggle').classList.contains('on');
-  const whiteBg= !alphaOnly && document.getElementById('bgToggle').classList.contains('on');
-  const thresh = parseInt(document.getElementById('inkThresh').value);
-  const feather= parseInt(document.getElementById('edgeFeather').value);
-  const tintStr= document.getElementById('tintStrength').value/100;
-  const sat    = document.getElementById('saturation').value/100;
-  const contr  = document.getElementById('contrast').value/100;
-  const bright = document.getElementById('brightness').value/100;
-  const [tr,tg,tb]=hslToRgb(tintH/360,tintS,0.5);
-
-  // Draw raw frames
-  drawMirrored(pCtx,plateVideo,W,H,mirH,mirV);
-  drawMirrored(iCtx,inkVideo,  W,H,mirH,mirV);
-
-  // Get pixel data
-  const plateData = pCtx.getImageData(0,0,W,H);
-  const inkData   = iCtx.getImageData(0,0,W,H);
-  const pd=plateData.data, id=inkData.data;
-
-  // Grade plate
-  for(let i=0;i<pd.length;i+=4){
-    let r=pd[i],g=pd[i+1],b=pd[i+2];
-    const gray=0.299*r+0.587*g+0.114*b;
-    r=r+(gray-r)*sat; g=g+(gray-g)*sat; b=b+(gray-b)*sat;
-    r=((r/255-.5)*contr+.5)*255*bright;
-    g=((g/255-.5)*contr+.5)*255*bright;
-    b=((b/255-.5)*contr+.5)*255*bright;
-    if(bw){const bwv=0.299*r+0.587*g+0.114*b;r=g=b=bwv;}
-    else{r+=(tr-128)*tintStr*2;g+=(tg-128)*tintStr*2;b+=(tb-128)*tintStr*2;}
-    pd[i]=clamp(r);pd[i+1]=clamp(g);pd[i+2]=clamp(b);
-  }
-
-  // Build mask from ink (dark pixels = mask ON)
-  const maskAlpha=new Float32Array(W*H);
-  for(let p=0;p<W*H;p++){
-    const i=p*4;
-    const lum=0.299*id[i]+0.587*id[i+1]+0.114*id[i+2];
-    maskAlpha[p]=lum<thresh?1.0:0.0;
-  }
-
-  // Feather the mask via box blur approximation
-  if(feather>0) blurMask(maskAlpha,W,H,feather);
-
-  // Build output pixels
-  const out=ctx.createImageData(W,H);
-  const od=out.data;
-
-  const bgR=whiteBg?255:0, bgG=whiteBg?255:0, bgB=whiteBg?255:0;
-  const bgA=alphaOnly?0:(whiteBg?255:0);
-
-  for(let p=0;p<W*H;p++){
-    const i=p*4;
-    const m=maskAlpha[p]; // 0..1
-    const invM=1-m;
-
-    if(compositeMode==='inkMasksPerson'){
-      // mask=1 → show person; mask=0 → transparent/bg
-      const a=Math.round(m*255);
-      od[i]  =pd[i];
-      od[i+1]=pd[i+1];
-      od[i+2]=pd[i+2];
-      od[i+3]=alphaOnly?a:Math.round(m*255+(1-m)*(bgA));
-      if(!alphaOnly){
-        od[i]  =Math.round(m*pd[i]  +invM*bgR);
-        od[i+1]=Math.round(m*pd[i+1]+invM*bgG);
-        od[i+2]=Math.round(m*pd[i+2]+invM*bgB);
-        od[i+3]=255;
-      }
-    } else if(compositeMode==='personCutsInk'){
-      // mask=1 → show person; mask=0 → show ink (ink background)
-      // Both layers fully opaque, person wins where mask is on
-      const inkR=bw?Math.round(0.299*id[i]+0.587*id[i+1]+0.114*id[i+2]):clamp(0.299*id[i]+0.587*id[i+1]+0.114*id[i+2]+(tr-128)*tintStr*1.5);
-      const inkG=bw?inkR:clamp(0.299*id[i]+0.587*id[i+1]+0.114*id[i+2]+(tg-128)*tintStr*1.5);
-      const inkB=bw?inkR:clamp(0.299*id[i]+0.587*id[i+1]+0.114*id[i+2]+(tb-128)*tintStr*1.5);
-      const ir2=bw?inkR:inkR, ig2=bw?inkR:inkG, ib2=bw?inkR:inkB;
-      if(alphaOnly){
-        // fully opaque composite
-        od[i]  =Math.round(m*pd[i]  +invM*ir2);
-        od[i+1]=Math.round(m*pd[i+1]+invM*ig2);
-        od[i+2]=Math.round(m*pd[i+2]+invM*ib2);
-        od[i+3]=255;
-      } else {
-        od[i]  =Math.round(m*pd[i]  +invM*ir2);
-        od[i+1]=Math.round(m*pd[i+1]+invM*ig2);
-        od[i+2]=Math.round(m*pd[i+2]+invM*ib2);
-        od[i+3]=255;
-      }
-    } else {
-      // side by side split
-      if(i/4%W < W/2){
-        od[i]=pd[i];od[i+1]=pd[i+1];od[i+2]=pd[i+2];od[i+3]=255;
-      } else {
-        const inkLum=clamp(0.299*id[i]+0.587*id[i+1]+0.114*id[i+2]);
-        od[i]=bw?inkLum:clamp(inkLum+(tr-128)*tintStr);
-        od[i+1]=bw?inkLum:clamp(inkLum+(tg-128)*tintStr);
-        od[i+2]=bw?inkLum:clamp(inkLum+(tb-128)*tintStr);
-        od[i+3]=255;
-      }
-    }
-  }
-  ctx.putImageData(out,0,0);
+ctx.putImageData(output,0,0);
 }
 
-// ── MASK BLUR (box blur for feathering) ───────────────────────
-function blurMask(mask,W,H,r){
-  const tmp=new Float32Array(mask.length);
-  for(let y=0;y<H;y++){
-    for(let x=0;x<W;x++){
-      let sum=0,cnt=0;
-      for(let dx=-r;dx<=r;dx++){
-        const nx=x+dx;
-        if(nx>=0&&nx<W){sum+=mask[y*W+nx];cnt++;}
-      }
-      tmp[y*W+x]=sum/cnt;
-    }
-  }
-  for(let y=0;y<H;y++){
-    for(let x=0;x<W;x++){
-      let sum=0,cnt=0;
-      for(let dy=-r;dy<=r;dy++){
-        const ny=y+dy;
-        if(ny>=0&&ny<H){sum+=tmp[ny*W+x];cnt++;}
-      }
-      mask[y*W+x]=sum/cnt;
-    }
-  }
+requestAnimationFrame(render);
 }
 
-// ── MIRRORING ──────────────────────────────────────────────────
-// Snapshot src to a temp canvas ONCE, then mirror from that — guarantees both halves are identical frame
-const _snapCanvas = document.createElement('canvas');
-const _snapCtx    = _snapCanvas.getContext('2d');
-
-function drawMirrored(ctx, src, W, H, mH, mV) {
-  // Ensure snap canvas is right size
-  if (_snapCanvas.width !== W || _snapCanvas.height !== H) {
-    _snapCanvas.width = W; _snapCanvas.height = H;
-  }
-  // Capture single frame
-  _snapCtx.drawImage(src, 0, 0, W, H);
-
-  ctx.clearRect(0, 0, W, H);
-
-  if (mH) {
-    const hw = W / 2;
-    // Left half: draw directly from snapshot
-    ctx.drawImage(_snapCanvas, 0, 0, hw, H, 0, 0, hw, H);
-    // Right half: flip the left half horizontally
-    ctx.save();
-    ctx.translate(W, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(_snapCanvas, 0, 0, hw, H, 0, 0, hw, H);
-    ctx.restore();
-  } else {
-    ctx.drawImage(_snapCanvas, 0, 0, W, H);
-  }
-
-  if (mV) {
-    const hh = H / 2;
-    // Snapshot what we just drew (top half), flip to bottom
-    const topData = ctx.getImageData(0, 0, W, hh);
-    const tc = document.createElement('canvas'); tc.width = W; tc.height = hh;
-    tc.getContext('2d').putImageData(topData, 0, 0);
-    ctx.save();
-    ctx.translate(0, H);
-    ctx.scale(1, -1);
-    ctx.drawImage(tc, 0, 0);
-    ctx.restore();
-  }
-}
-
-// ── PLAYBACK ───────────────────────────────────────────────────
-function togglePlay(){
-  const btn=document.getElementById('playBtn');
-  if(!isPlaying){
-    plateVideo.play();inkVideo.play();isPlaying=true;
-    btn.textContent='⏸ Pause';
-    document.getElementById('statusBar').textContent='PLAYING';
-  } else {
-    plateVideo.pause();inkVideo.pause();isPlaying=false;
-    btn.textContent='▶ Play';
-    document.getElementById('statusBar').textContent='PAUSED';
-  }
-}
-
-// ── UI ─────────────────────────────────────────────────────────
-function updateVal(id,val){document.getElementById(id).textContent=val;}
-function updatePreview(){if(processed){if(animFrame)cancelAnimationFrame(animFrame);animFrame=requestAnimationFrame(renderLoop);}}
-
-const modeDescs={
-  inkMasksPerson:'Ink shape reveals person inside. Outside the ink shape = transparent on export.',
-  personCutsInk: 'Full ink layer everywhere. Person\'s silhouette cuts through and shows through.',
-  sideBySide:    'Left: person plate. Right: ink. For reference comparison.'
-};
-function setMode(m){
-  compositeMode=m;
-  ['modeA','modeB','modeC'].forEach(id=>document.getElementById(id).classList.remove('active'));
-  const map={inkMasksPerson:'modeA',personCutsInk:'modeB',sideBySide:'modeC'};
-  document.getElementById(map[m]).classList.add('active');
-  document.getElementById('modeDesc').textContent=modeDescs[m];
-  updatePreview();
-}
-
-function toggleBW(){
-  const bw=document.getElementById('bwToggle').classList.contains('on');
-  document.getElementById('colorControls').style.opacity=bw?.3:1;
-  document.getElementById('colorControls').style.pointerEvents=bw?'none':'auto';
-}
-
-function toggleAlphaBg(){
-  const on=document.getElementById('alphaToggle').classList.contains('on');
-  document.getElementById('canvasWrap').classList.toggle('checker',on);
-}
-
-const exportNotes=[
-  'Full composite · transparent background · alpha PNG',
-  'Ink layer only · ink shape opaque · rest transparent · alpha PNG',
-  'Person layer only · clipped to ink mask · alpha PNG'
-];
-function setExportMode(n){
-  exportModeNum=n;
-  ['tab0','tab1','tab2'].forEach((id,i)=>document.getElementById(id).classList.toggle('active',i===n));
-  document.getElementById('exportNote').textContent=exportNotes[n];
-}
-
-// ── EXPORT: SINGLE FRAME ───────────────────────────────────────
-function exportCurrentFrame(){
-  if(!processed)return;
-  const W=outCanvas.width,H=outCanvas.height;
-  const ec=document.createElement('canvas');ec.width=W;ec.height=H;
-  const ex=ec.getContext('2d');
-  buildExportFrame(ex,W,H);
-  ec.toBlob(blob=>{
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);
-    a.download=`inkform_${plateBaseName}_${['composite','ink_only','person_only'][exportModeNum]}_frame.png`;
-    a.click();
-  },'image/png');
-}
-
-function exportSettings(){
-  if(!processed)return;
-  const layerLabel=['composite','ink_only','person_only'][exportModeNum];
-  const baseName=`inkform_${plateBaseName}_${layerLabel}`;
-  const fps=parseInt(document.getElementById('exportFps').value);
-  const dur=plateVideo.duration||0;
-  const total=Math.floor(dur*fps);
-  const txt=buildSettingsTxt(baseName, total, fps);
-  const blob=new Blob([txt],{type:'text/plain'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`${baseName}_settings.txt`;
-  a.click();
-}
-
-// ── SETTINGS TXT ───────────────────────────────────────────────
-function buildSettingsTxt(zipName, totalFrames, fps){
-  const bw      = document.getElementById('bwToggle').classList.contains('on');
-  const whiteBg = document.getElementById('bgToggle').classList.contains('on');
-  const mirH    = document.getElementById('mirrorH').classList.contains('on');
-  const mirV    = document.getElementById('mirrorV').classList.contains('on');
-  const thresh  = document.getElementById('inkThresh').value;
-  const feather = document.getElementById('edgeFeather').value;
-  const tintStr = document.getElementById('tintStrength').value;
-  const sat     = document.getElementById('saturation').value;
-  const contr   = document.getElementById('contrast').value;
-  const bright  = document.getElementById('brightness').value;
-  const [tr,tg,tb] = hslToRgb(tintH/360, tintS, 0.5);
-  const hexColor = '#'+[tr,tg,tb].map(v=>v.toString(16).padStart(2,'0')).join('');
-  const now = new Date().toISOString().replace('T',' ').slice(0,19);
-
-  return [
-    `INKFORM — Export Settings`,
-    `Generated: ${now}`,
-    ``,
-    `── SOURCE ─────────────────────────`,
-    `Person plate   : ${plateBaseName}`,
-    `Ink footage    : ${inkBaseName}`,
-    ``,
-    `── OUTPUT ─────────────────────────`,
-    `Export name    : ${zipName}`,
-    `Layer mode     : ${['Composite','Ink Only','Person Only'][exportModeNum]}`,
-    `Composite mode : ${compositeMode}`,
-    `Total frames   : ${totalFrames}`,
-    `Frame rate     : ${fps} fps`,
-    `Alpha channel  : yes (PNG)`,
-    ``,
-    `── MIRROR ─────────────────────────`,
-    `Horizontal     : ${mirH?'on':'off'}`,
-    `Vertical       : ${mirV?'on':'off'}`,
-    ``,
-    `── MASKING ────────────────────────`,
-    `Ink threshold  : ${thresh}  (0=all mask / 255=no mask)`,
-    `Edge feather   : ${feather}px`,
-    ``,
-    `── COLOR ──────────────────────────`,
-    `Black & White  : ${bw?'on':'off'}`,
-    `Tint hue       : ${Math.round(tintH)}°`,
-    `Tint saturation: ${Math.round(tintS*100)}%`,
-    `Tint hex       : ${hexColor}`,
-    `Tint strength  : ${tintStr}%`,
-    `Desaturate     : ${sat}%`,
-    `Contrast       : ${(contr/100).toFixed(2)}`,
-    `Brightness     : ${(bright/100).toFixed(2)}`,
-    ``,
-    `── BACKGROUND ─────────────────────`,
-    `White paper    : ${whiteBg?'on':'off'}`,
-  ].join('\n');
-}
-
-// ── EXPORT: PNG SEQUENCE → ZIP ─────────────────────────────────
-async function exportSequence(){
-  if(!processed||isExporting)return;
-  isExporting=true;
-  const fps=parseInt(document.getElementById('exportFps').value);
-  const dur=plateVideo.duration;
-  const total=Math.floor(dur*fps);
-  const W=outCanvas.width,H=outCanvas.height;
-  const sp=document.getElementById('seqProgress');
-  const sf=document.getElementById('seqFill');
-  const si=document.getElementById('seqInfo');
-  sp.style.display='block'; si.style.display='block';
-
-  const layerLabel=['composite','ink_only','person_only'][exportModeNum];
-  const seqName=`inkform_${plateBaseName}_${layerLabel}`;
-
-  // Check File System Access API support
-  if(!window.showDirectoryPicker){
-    si.textContent='Browser does not support folder picker — try Chrome or Edge.';
-    isExporting=false; return;
-  }
-
-  // Show folder picker
-  let dirHandle;
-  try {
-    dirHandle = await window.showDirectoryPicker({
-      id: 'inkform-export',
-      mode: 'readwrite',
-      startIn: 'downloads',
-      suggestedName: seqName
-    });
-  } catch(e) {
-    si.textContent='Folder selection cancelled.';
-    isExporting=false; return;
-  }
-
-  // Create subfolder named after the sequence
-  let subDir;
-  try {
-    subDir = await dirHandle.getDirectoryHandle(seqName, {create:true});
-  } catch(e) {
-    si.textContent='Could not create subfolder — try selecting a different location.';
-    isExporting=false; return;
-  }
-
-  const wasPlaying=isPlaying;
-  if(isPlaying)togglePlay();
-  if(animFrame){cancelAnimationFrame(animFrame);animFrame=null;}
-
-  const ec=document.createElement('canvas'); ec.width=W; ec.height=H;
-  const ex=ec.getContext('2d');
-
-  for(let f=0;f<total;f++){
-    const t=f/fps;
-    plateVideo.currentTime=t;
-    inkVideo.currentTime=t%(inkVideo.duration||dur);
-    await waitSeeked();
-
-    drawMirrored(pCtx,plateVideo,W,H,
-      document.getElementById('mirrorH').classList.contains('on'),
-      document.getElementById('mirrorV').classList.contains('on'));
-    drawMirrored(iCtx,inkVideo,W,H,
-      document.getElementById('mirrorH').classList.contains('on'),
-      document.getElementById('mirrorV').classList.contains('on'));
-    buildExportFrame(ex,W,H);
-
-    const fname=`${seqName}_${String(f).padStart(5,'0')}.png`;
-    const blob=await canvasToBlob(ec);
-    const arrayBuf=await blob.arrayBuffer();
-
-    const fileHandle=await subDir.getFileHandle(fname,{create:true});
-    const writable=await fileHandle.createWritable();
-    await writable.write(arrayBuf);
-    await writable.close();
-
-    sf.style.width=((f+1)/total*100)+'%';
-    si.textContent=`Writing frame ${f+1} / ${total} → ${fname}`;
-    await new Promise(r=>setTimeout(r,4));
-  }
-
-  isExporting=false;
-  si.textContent=`✓ Done — ${total} frames written to /${seqName}/`;
-  document.getElementById('statusBar').textContent='EXPORT COMPLETE';
-  if(wasPlaying)togglePlay(); else {animFrame=requestAnimationFrame(renderLoop);}
-}
-
-function canvasToBlob(canvas){
-  return new Promise(res=>canvas.toBlob(res,'image/png'));
-}
-
-function waitSeeked(){
-  return new Promise(res=>{
-    let d1=false,d2=false;
-    const check=()=>{if(d1&&d2)res();};
-    setTimeout(res,500);
-    plateVideo.addEventListener('seeked',()=>{d1=true;check();},{once:true});
-    inkVideo.addEventListener('seeked',()=>{d2=true;check();},{once:true});
-  });
-}
-
-// Build export frame into given ctx (always alpha, no bg fill)
-function buildExportFrame(ctx,W,H){
-  const mirH=document.getElementById('mirrorH').classList.contains('on');
-  const mirV=document.getElementById('mirrorV').classList.contains('on');
-  const bw=document.getElementById('bwToggle').classList.contains('on');
-  const thresh=parseInt(document.getElementById('inkThresh').value);
-  const feather=parseInt(document.getElementById('edgeFeather').value);
-  const tintStr=document.getElementById('tintStrength').value/100;
-  const sat=document.getElementById('saturation').value/100;
-  const contr=document.getElementById('contrast').value/100;
-  const bright=document.getElementById('brightness').value/100;
-  const[tr,tg,tb]=hslToRgb(tintH/360,tintS,0.5);
-
-  const pd=pCtx.getImageData(0,0,W,H).data;
-  const id=iCtx.getImageData(0,0,W,H).data;
-
-  // Grade plate pixels
-  const gradedP=new Uint8ClampedArray(pd.length);
-  for(let i=0;i<pd.length;i+=4){
-    let r=pd[i],g=pd[i+1],b=pd[i+2];
-    const gray=0.299*r+0.587*g+0.114*b;
-    r=r+(gray-r)*sat;g=g+(gray-g)*sat;b=b+(gray-b)*sat;
-    r=((r/255-.5)*contr+.5)*255*bright;
-    g=((g/255-.5)*contr+.5)*255*bright;
-    b=((b/255-.5)*contr+.5)*255*bright;
-    if(bw){const bwv=clamp(0.299*r+0.587*g+0.114*b);r=g=b=bwv;}
-    else{r+=(tr-128)*tintStr*2;g+=(tg-128)*tintStr*2;b+=(tb-128)*tintStr*2;}
-    gradedP[i]=clamp(r);gradedP[i+1]=clamp(g);gradedP[i+2]=clamp(b);gradedP[i+3]=255;
-  }
-
-  const mask=new Float32Array(W*H);
-  for(let p=0;p<W*H;p++){const i=p*4;const lum=0.299*id[i]+0.587*id[i+1]+0.114*id[i+2];mask[p]=lum<thresh?1:0;}
-  if(feather>0)blurMask(mask,W,H,feather);
-
-  const out=ctx.createImageData(W,H);
-  const od=out.data;
-
-  for(let p=0;p<W*H;p++){
-    const i=p*4;
-    const m=mask[p];
-    if(exportModeNum===0){
-      // composite: person visible where mask on, transparent where off
-      if(compositeMode==='personCutsInk'){
-        // fully opaque: person where mask, ink elsewhere
-        const inkLum=clamp(0.299*id[i]+0.587*id[i+1]+0.114*id[i+2]);
-        const ir=bw?inkLum:clamp(inkLum+(tr-128)*tintStr*1.5);
-        const ig=bw?inkLum:clamp(inkLum+(tg-128)*tintStr*1.5);
-        const ib2=bw?inkLum:clamp(inkLum+(tb-128)*tintStr*1.5);
-        od[i]  =Math.round(m*gradedP[i]  +(1-m)*ir);
-        od[i+1]=Math.round(m*gradedP[i+1]+(1-m)*ig);
-        od[i+2]=Math.round(m*gradedP[i+2]+(1-m)*ib2);
-        od[i+3]=255;
-      } else {
-        od[i]=gradedP[i];od[i+1]=gradedP[i+1];od[i+2]=gradedP[i+2];
-        od[i+3]=Math.round(m*255);
-      }
-    } else if(exportModeNum===1){
-      // ink layer: ink shape = opaque dark, rest transparent
-      const inkLum=clamp(0.299*id[i]+0.587*id[i+1]+0.114*id[i+2]);
-      od[i]  =bw?0:clamp((tr/255)*80);
-      od[i+1]=bw?0:clamp((tg/255)*80);
-      od[i+2]=bw?0:clamp((tb/255)*80);
-      od[i+3]=Math.round(m*255);
-    } else {
-      // person layer clipped to mask
-      od[i]=gradedP[i];od[i+1]=gradedP[i+1];od[i+2]=gradedP[i+2];
-      od[i+3]=Math.round(m*255);
-    }
-  }
-  ctx.putImageData(out,0,0);
-}
-
-// ── COLOR WHEEL ────────────────────────────────────────────────
-function drawColorWheel(){
-  const wc=document.getElementById('colorWheel');
-  const wx=wc.getContext('2d');
-  const cx=34,cy=34,r=32;
-  for(let a=0;a<360;a++){
-    const s=(a-1)*Math.PI/180, e=(a+1)*Math.PI/180;
-    const g=wx.createRadialGradient(cx,cy,0,cx,cy,r);
-    g.addColorStop(0,`hsl(${a},0%,100%)`);
-    g.addColorStop(1,`hsl(${a},100%,50%)`);
-    wx.beginPath();wx.moveTo(cx,cy);wx.arc(cx,cy,r,s,e);wx.closePath();
-    wx.fillStyle=g;wx.fill();
-  }
-}
-
-function pickColor(e){
-  const wc=document.getElementById('colorWheel');
-  const rect=wc.getBoundingClientRect();
-  const x=e.clientX-rect.left-34, y=e.clientY-rect.top-34;
-  const dist=Math.sqrt(x*x+y*y);
-  if(dist>34)return;
-  tintH=((Math.atan2(y,x)*180/Math.PI)+360)%360;
-  tintS=Math.min(1,dist/34);
-  document.getElementById('wheelCursor').style.left=(x+34)+'px';
-  document.getElementById('wheelCursor').style.top=(y+34)+'px';
-  const[r,g,b]=hslToRgb(tintH/360,tintS,0.5);
-  document.getElementById('colorPreview').style.background=`rgb(${r},${g},${b})`;
-  updatePreview();
-}
-
-document.getElementById('colorWheel').addEventListener('mousedown',e=>{
-  pickColor(e);
-  const mv=ev=>pickColor(ev);
-  const up=()=>{window.removeEventListener('mousemove',mv);window.removeEventListener('mouseup',up);};
-  window.addEventListener('mousemove',mv);window.addEventListener('mouseup',up);
-});
-
-function hslToRgb(h,s,l){
-  let r,g,b;
-  if(s===0){r=g=b=l;}
-  else{
-    const q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;
-    const f=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;};
-    r=f(p,q,h+1/3);g=f(p,q,h);b=f(p,q,h-1/3);
-  }
-  return[Math.round(r*255),Math.round(g*255),Math.round(b*255)];
-}
-
-function clamp(v){return Math.max(0,Math.min(255,Math.round(v)));}
-
-// ── INIT ───────────────────────────────────────────────────────
-drawColorWheel();
-// Set cursor to purple default
-const initAngle=270*Math.PI/180, initDist=0.6*34;
-document.getElementById('wheelCursor').style.left=(34+Math.cos(initAngle)*initDist)+'px';
-document.getElementById('wheelCursor').style.top= (34+Math.sin(initAngle)*initDist)+'px';
-const[ir,ig,ib]=hslToRgb(270/360,0.6,0.5);
-document.getElementById('colorPreview').style.background=`rgb(${ir},${ig},${ib})`;
+render();
 </script>
 </body>
 </html>
