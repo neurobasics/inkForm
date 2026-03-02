@@ -161,6 +161,28 @@
   </div>
 
   <div>
+    <div class="slabel">04b — Person Look</div>
+    <div class="cg">
+      <div class="desc" style="font-size:.5rem;line-height:1.4;margin-bottom:6px;">Crush person footage into graphic dark silhouettes. In the Crazy video, people are keyed and tinted black with only subtle tonal detail visible.</div>
+      <div class="cr">
+        <label>Posterize <span id="posterVal">0</span></label>
+        <input type="range" id="posterize" min="0" max="8" value="0" oninput="updateVal('posterVal',this.value);updatePreview()">
+      </div>
+      <div class="desc" style="font-size:.5rem;color:var(--gray);line-height:1.3;margin-bottom:4px;">0 = off. 2 = stark two-tone. 4-6 = graphic. 8 = subtle banding.</div>
+      <div class="cr">
+        <label>Crush to black <span id="crushVal">0%</span></label>
+        <input type="range" id="crushBlack" min="0" max="100" value="0" oninput="updateVal('crushVal',this.value+'%');updatePreview()">
+      </div>
+      <div class="desc" style="font-size:.5rem;color:var(--gray);line-height:1.3;margin-bottom:4px;">Darkens the person toward pure silhouette. 70-85% matches the Crazy video look.</div>
+      <div class="cr">
+        <label>Detail boost <span id="detailVal">0%</span></label>
+        <input type="range" id="detailBoost" min="0" max="100" value="0" oninput="updateVal('detailVal',this.value+'%');updatePreview()">
+      </div>
+      <div class="desc" style="font-size:.5rem;color:var(--gray);line-height:1.3;">Sharpens edges within the crushed person. Brings out facial features and clothing folds as graphic lines.</div>
+    </div>
+  </div>
+
+  <div>
     <div class="slabel">05 — Color</div>
     <div class="cg">
       <div class="tr">
@@ -424,6 +446,9 @@ function draw(ctx, W, H, alphaOnly){
   const inkTintOn = document.getElementById('inkTintToggle').classList.contains('on');
   const grain  = parseInt(document.getElementById('paperGrain').value) / 100;
   const rampLUT = tintMode==='ramp' ? buildRampLUT() : null;
+  const posterLvl = parseInt(document.getElementById('posterize').value);
+  const crushAmt = parseInt(document.getElementById('crushBlack').value) / 100;
+  const detailAmt = parseInt(document.getElementById('detailBoost').value) / 100;
 
   // Draw raw frames — shared spread for person + ink
   drawMirrored(pCtx,plateVideo,W,H,mirH,mirV,spread);
@@ -462,6 +487,47 @@ function draw(ctx, W, H, alphaOnly){
     }
     if(bw){const bwv=0.299*r+0.587*g+0.114*b;r=g=b=bwv;}
     pd[i]=clamp(r);pd[i+1]=clamp(g);pd[i+2]=clamp(b);
+  }
+
+  // PERSON LOOK — crush plate into graphic silhouette
+  if(posterLvl>=2 || crushAmt>0 || detailAmt>0){
+    if(posterLvl>=2){
+      for(let i=0;i<pd.length;i+=4){
+        const lum=0.299*pd[i]+0.587*pd[i+1]+0.114*pd[i+2];
+        if(lum<2) continue;
+        const q=Math.round(lum/255*(posterLvl-1))/(posterLvl-1)*255;
+        const ratio=lum>0?q/lum:0;
+        pd[i]=clamp(pd[i]*ratio);
+        pd[i+1]=clamp(pd[i+1]*ratio);
+        pd[i+2]=clamp(pd[i+2]*ratio);
+      }
+    }
+    if(crushAmt>0){
+      const keep=1-crushAmt;
+      for(let i=0;i<pd.length;i+=4){
+        pd[i]=clamp(pd[i]*keep);
+        pd[i+1]=clamp(pd[i+1]*keep);
+        pd[i+2]=clamp(pd[i+2]*keep);
+      }
+    }
+    if(detailAmt>0){
+      const lums=new Float32Array(W*H);
+      for(let p=0;p<W*H;p++){
+        const ii=p*4;
+        lums[p]=0.299*pd[ii]+0.587*pd[ii+1]+0.114*pd[ii+2];
+      }
+      for(let y=1;y<H-1;y++){
+        for(let x=1;x<W-1;x++){
+          const p=y*W+x;
+          const avg=(lums[p-1]+lums[p+1]+lums[p-W]+lums[p+W])*0.25;
+          const edge=(lums[p]-avg)*detailAmt*3;
+          const ii=p*4;
+          pd[ii]=clamp(pd[ii]+edge);
+          pd[ii+1]=clamp(pd[ii+1]+edge);
+          pd[ii+2]=clamp(pd[ii+2]+edge);
+        }
+      }
+    }
   }
 
   // Build ink mask — sigmoid curve
@@ -883,6 +949,11 @@ function buildSettingsTxt(zipName, totalFrames, fps){
     `Edge falloff   : ${feather}`,
     `Edge smooth    : ${document.getElementById('edgeSmooth').value}`,
     `Person shape   : ${document.getElementById('personShape').value}%`,
+    ``,
+    `── PERSON LOOK ────────────────────`,
+    `Posterize      : ${document.getElementById('posterize').value}`,
+    `Crush to black : ${document.getElementById('crushBlack').value}%`,
+    `Detail boost   : ${document.getElementById('detailBoost').value}%`,
     `Invert (white) : ${document.getElementById('invertToggle').classList.contains('on')?'on':'off'}`,
     ``,
     `── COLOR ──────────────────────────`,
@@ -1026,6 +1097,9 @@ function buildExportFrame(ctx,W,H){
   const inkTintOn=document.getElementById('inkTintToggle').classList.contains('on');
   const grain=parseInt(document.getElementById('paperGrain').value)/100;
   const rampLUT = tintMode==='ramp' ? buildRampLUT() : null;
+  const posterLvl = parseInt(document.getElementById('posterize').value);
+  const crushAmt = parseInt(document.getElementById('crushBlack').value) / 100;
+  const detailAmt = parseInt(document.getElementById('detailBoost').value) / 100;
 
   const pd=pCtx.getImageData(0,0,W,H).data;
   const id=iCtx.getImageData(0,0,W,H).data;
@@ -1059,6 +1133,47 @@ function buildExportFrame(ctx,W,H){
     }
     if(bw){const bwv=clamp(0.299*r+0.587*g+0.114*b);r=g=b=bwv;}
     gradedP[i]=clamp(r);gradedP[i+1]=clamp(g);gradedP[i+2]=clamp(b);gradedP[i+3]=255;
+  }
+
+  // PERSON LOOK — crush plate into graphic silhouette
+  if(posterLvl>=2 || crushAmt>0 || detailAmt>0){
+    if(posterLvl>=2){
+      for(let i=0;i<gradedP.length;i+=4){
+        const lum=0.299*gradedP[i]+0.587*gradedP[i+1]+0.114*gradedP[i+2];
+        if(lum<2) continue;
+        const q=Math.round(lum/255*(posterLvl-1))/(posterLvl-1)*255;
+        const ratio=lum>0?q/lum:0;
+        gradedP[i]=clamp(gradedP[i]*ratio);
+        gradedP[i+1]=clamp(gradedP[i+1]*ratio);
+        gradedP[i+2]=clamp(gradedP[i+2]*ratio);
+      }
+    }
+    if(crushAmt>0){
+      const keep=1-crushAmt;
+      for(let i=0;i<gradedP.length;i+=4){
+        gradedP[i]=clamp(gradedP[i]*keep);
+        gradedP[i+1]=clamp(gradedP[i+1]*keep);
+        gradedP[i+2]=clamp(gradedP[i+2]*keep);
+      }
+    }
+    if(detailAmt>0){
+      const lums=new Float32Array(W*H);
+      for(let p=0;p<W*H;p++){
+        const ii=p*4;
+        lums[p]=0.299*gradedP[ii]+0.587*gradedP[ii+1]+0.114*gradedP[ii+2];
+      }
+      for(let y=1;y<H-1;y++){
+        for(let x=1;x<W-1;x++){
+          const p=y*W+x;
+          const avg=(lums[p-1]+lums[p+1]+lums[p-W]+lums[p+W])*0.25;
+          const edge=(lums[p]-avg)*detailAmt*3;
+          const ii=p*4;
+          gradedP[ii]=clamp(gradedP[ii]+edge);
+          gradedP[ii+1]=clamp(gradedP[ii+1]+edge);
+          gradedP[ii+2]=clamp(gradedP[ii+2]+edge);
+        }
+      }
+    }
   }
 
   // Sigmoid mask + person shape
@@ -1497,6 +1612,13 @@ function loadCrazyPreset(){
   // Smooth out fine detail into flowing curves
   document.getElementById('edgeSmooth').value=3;
   updateVal('smoothVal','3');
+  // Person look — keyed and tinted black like in the Crazy video
+  document.getElementById('posterize').value=4;
+  updateVal('posterVal','4');
+  document.getElementById('crushBlack').value=75;
+  updateVal('crushVal','75%');
+  document.getElementById('detailBoost').value=30;
+  updateVal('detailVal','30%');
   updatePreview();
 }
 
