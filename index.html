@@ -310,6 +310,8 @@
       <button class="btn-exp" id="exportFrameBtn" onclick="exportCurrentFrame()">↓ Export Frame (PNG + α)</button>
       <button class="btn-exp" id="exportSeqBtn" onclick="exportSequence()">↓ Export PNG Sequence → Choose Folder</button>
       <button class="btn-exp" id="exportSettingsBtn" onclick="exportSettings()">↓ Export Settings (TXT)</button>
+      <button class="btn-exp" id="importSettingsBtn" style="display:block" onclick="document.getElementById('settingsFileInput').click()">↑ Import Settings (TXT)</button>
+      <input type="file" id="settingsFileInput" accept=".txt" style="display:none" onchange="handleSettingsImport(this)">
     </div>
   </div>
 
@@ -903,6 +905,135 @@ function exportSettings(){
   a.click();
 }
 
+function handleSettingsImport(input){
+  const file=input.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    importSettings(e.target.result);
+    input.value=''; // reset so same file can be re-imported
+  };
+  reader.readAsText(file);
+}
+
+function importSettings(txt){
+  const lines=txt.split('\n');
+  const get=(key)=>{
+    for(const line of lines){
+      const idx=line.indexOf(':');
+      if(idx<0) continue;
+      const k=line.slice(0,idx).trim();
+      if(k.toLowerCase()===key.toLowerCase()) return line.slice(idx+1).trim();
+    }
+    return null;
+  };
+  const num=(v)=>parseFloat(v);
+  const onOff=(v)=>v&&v.toLowerCase()==='on';
+  const pct=(v)=>v?parseInt(v):0;
+
+  // Mirror
+  const mH=get('Horizontal'); if(mH!==null){ const el=document.getElementById('mirrorH'); if(onOff(mH)) el.classList.add('on'); else el.classList.remove('on'); }
+  const mV=get('Vertical'); if(mV!==null){ const el=document.getElementById('mirrorV'); if(onOff(mV)) el.classList.add('on'); else el.classList.remove('on'); }
+  const spread=get('Mirror amount'); if(spread!==null){ document.getElementById('mirrorSpread').value=Math.round(num(spread)*100); updateVal('spreadVal',num(spread).toFixed(2)); }
+
+  // Center ink overlay
+  const cEn=get('Enabled'); // first "Enabled" is center ink
+  // We need to be smarter — track which section we're in
+  let section='';
+  for(const line of lines){
+    if(line.includes('── MIRROR')) section='mirror';
+    else if(line.includes('── CENTER INK')) section='centerink';
+    else if(line.includes('── MASKING')) section='masking';
+    else if(line.includes('── PERSON LOOK')) section='personlook';
+    else if(line.includes('── COLOR')) section='color';
+    else if(line.includes('── BACKGROUND')) section='background';
+    else if(line.includes('── SCAN LINES')) section='scanlines';
+    const idx=line.indexOf(':');
+    if(idx<0) continue;
+    const k=line.slice(0,idx).trim();
+    const v=line.slice(idx+1).trim();
+
+    if(section==='centerink'){
+      if(k==='Enabled'){ const el=document.getElementById('centerInkToggle'); if(onOff(v)) el.classList.add('on'); else el.classList.remove('on'); }
+      if(k==='Overlay mirror'){ document.getElementById('centerInkSpread').value=Math.round(num(v)*100); updateVal('centerSpreadVal',num(v).toFixed(2)); }
+      if(k==='Overlay opacity'){ document.getElementById('centerInkOpacity').value=pct(v); updateVal('centerOpVal',pct(v)+'%'); }
+    }
+
+    if(section==='masking'){
+      if(k==='Ink threshold'){ document.getElementById('inkThresh').value=parseInt(v); updateVal('threshVal',parseInt(v)); }
+      if(k==='Edge falloff'){ document.getElementById('edgeFeather').value=parseInt(v); updateVal('featherVal',parseInt(v)); }
+      if(k==='Edge smooth'){ document.getElementById('edgeSmooth').value=parseInt(v); updateVal('smoothVal',parseInt(v)); }
+      if(k==='Person shape'){ document.getElementById('personShape').value=pct(v); updateVal('shapeVal',pct(v)+'%'); }
+    }
+
+    if(section==='personlook'){
+      if(k==='Posterize'){ document.getElementById('posterize').value=parseInt(v); updateVal('posterVal',parseInt(v)); }
+      if(k==='Crush to black'){ document.getElementById('crushBlack').value=pct(v); updateVal('crushVal',pct(v)+'%'); }
+      if(k==='Detail boost'){ document.getElementById('detailBoost').value=pct(v); updateVal('detailVal',pct(v)+'%'); }
+      if(k==='Invert (white)'){ const el=document.getElementById('invertToggle'); if(onOff(v)) el.classList.add('on'); else el.classList.remove('on'); }
+    }
+
+    if(section==='color'){
+      if(k==='Black & White'){
+        const el=document.getElementById('bwToggle');
+        if(onOff(v)) el.classList.add('on'); else el.classList.remove('on');
+        toggleBW();
+      }
+      if(k==='Tint'){
+        // Parse: "Mode: Solid | Hex: #7C5CBF" or "Mode: Ramp | Type: luminance | Stops: #1A0A2E@0.000, ..."
+        if(v.includes('Solid')){
+          setTintMode('solid');
+          const hexMatch=v.match(/#[0-9a-fA-F]{6}/);
+          if(hexMatch) applyHexInput(hexMatch[0]);
+        } else if(v.includes('Ramp')){
+          setTintMode('ramp');
+          const typeMatch=v.match(/Type:\s*(\w+)/);
+          if(typeMatch) setRampType(typeMatch[1]);
+          const stopsMatch=v.match(/Stops:\s*(.+)$/);
+          if(stopsMatch){
+            const stopParts=stopsMatch[1].split(',').map(s=>s.trim());
+            rampStops=stopParts.map(s=>{
+              const[hex,pos]=s.split('@');
+              return {hex:hex.trim().toUpperCase(), pos:parseFloat(pos)};
+            }).filter(s=>!isNaN(s.pos));
+            selectedStop=0;
+            updateRampUI();
+          }
+        }
+      }
+      if(k==='Tint strength'){ document.getElementById('tintStrength').value=pct(v); updateVal('tintVal',pct(v)+'%'); }
+      if(k==='Desaturate'){ document.getElementById('saturation').value=pct(v); updateVal('satVal',pct(v)+'%'); }
+      if(k==='Contrast'){ document.getElementById('contrast').value=Math.round(num(v)*100); updateVal('contrastVal',num(v).toFixed(2)); }
+      if(k==='Brightness'){ document.getElementById('brightness').value=Math.round(num(v)*100); updateVal('brightnessVal',num(v).toFixed(2)); }
+      if(k==='Gamma'){ document.getElementById('gamma').value=Math.round(num(v)*100); updateVal('gammaVal',num(v).toFixed(1)); }
+    }
+
+    if(section==='background'){
+      if(k==='White paper'){ const el=document.getElementById('bgToggle'); if(onOff(v)) el.classList.add('on'); else el.classList.remove('on'); }
+      if(k==='Tint ink areas'){ const el=document.getElementById('inkTintToggle'); if(onOff(v)) el.classList.add('on'); else el.classList.remove('on'); }
+      if(k==='Paper grain'){ document.getElementById('paperGrain').value=pct(v); updateVal('grainVal',pct(v)+'%'); }
+    }
+
+    if(section==='scanlines'){
+      if(k==='Enabled'){ const el=document.getElementById('scanToggle'); if(onOff(v)) el.classList.add('on'); else el.classList.remove('on'); }
+      if(k==='Spacing'){ document.getElementById('scanSpacing').value=parseInt(v); updateVal('scanSpaceVal',parseInt(v)); }
+      if(k==='Opacity'){ document.getElementById('scanOpacity').value=pct(v); updateVal('scanOpVal',pct(v)+'%'); }
+    }
+  }
+
+  // Composite mode
+  const cm=get('Composite mode');
+  if(cm && (cm==='inkMasksPerson'||cm==='personCutsInk')) setMode(cm);
+
+  // Export FPS
+  const fps=get('Frame rate');
+  if(fps){ document.getElementById('exportFps').value=parseInt(fps); updateVal('fpsVal',parseInt(fps)); }
+
+  updatePreview();
+  document.getElementById('statusBar').textContent='SETTINGS IMPORTED';
+  setTimeout(()=>{ if(processed) document.getElementById('statusBar').textContent='PRESS PLAY TO ANIMATE'; },2000);
+}
+
 // ── SETTINGS TXT ───────────────────────────────────────────────
 function buildSettingsTxt(zipName, totalFrames, fps){
   const bw      = document.getElementById('bwToggle').classList.contains('on');
@@ -967,6 +1098,8 @@ function buildSettingsTxt(zipName, totalFrames, fps){
     ``,
     `── BACKGROUND ─────────────────────`,
     `White paper    : ${whiteBg?'on':'off'}`,
+    `Tint ink areas : ${document.getElementById('inkTintToggle').classList.contains('on')?'on':'off'}`,
+    `Paper grain    : ${document.getElementById('paperGrain').value}%`,
     ``,
     `── SCAN LINES ─────────────────────`,
     `Enabled        : ${document.getElementById('scanToggle').classList.contains('on')?'on':'off'}`,
